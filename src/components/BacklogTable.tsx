@@ -57,7 +57,10 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
     if (search.trim()) {
       const query = search.trim().toLowerCase();
-      result = result.filter((ticket) => ticket.title.toLowerCase().includes(query));
+      result = result.filter(
+        (ticket) =>
+          ticket.title.toLowerCase().includes(query) || ticket.tags.some((tag) => tag.toLowerCase().includes(query)),
+      );
     }
 
     if (jogFilter !== 'all') {
@@ -148,12 +151,6 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center gap-3">
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search title…"
-          className="w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
         <div className="relative">
           <select
             value={jogFilter}
@@ -176,6 +173,12 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
         >
           New jog
         </button>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Filter by title or tag…"
+          className="ml-auto w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">

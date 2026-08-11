@@ -15,6 +15,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [filterText, setFilterText] = useState('');
 
   if (initialTickets !== prevInitialTickets) {
     setPrevInitialTickets(initialTickets);
@@ -34,13 +35,18 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       done: [],
     };
     const sorted = [...tickets].sort((a, b) => a.order - b.order);
+    const query = filterText.trim().toLowerCase();
     for (const ticket of sorted) {
-      if (ticket.jogId === selectedJogId) {
-        grouped[ticket.status].push(ticket);
+      if (ticket.jogId !== selectedJogId) continue;
+      if (query) {
+        const matches =
+          ticket.title.toLowerCase().includes(query) || ticket.tags.some((tag) => tag.toLowerCase().includes(query));
+        if (!matches) continue;
       }
+      grouped[ticket.status].push(ticket);
     }
     return grouped;
-  }, [tickets, selectedJogId]);
+  }, [tickets, selectedJogId, filterText]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -135,6 +141,12 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
             {selectedJog.startDate ?? '…'} → {selectedJog.endDate ?? '…'}
           </span>
         )}
+        <input
+          value={filterText}
+          onChange={(event) => setFilterText(event.target.value)}
+          placeholder="Filter by title or tag…"
+          className="ml-auto w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

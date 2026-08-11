@@ -17,6 +17,7 @@ export function JogsList() {
   const [editingJog, setEditingJog] = useState<Jog | null>(null);
   const [deletingJog, setDeletingJog] = useState<Jog | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showNewJog, setShowNewJog] = useState(false);
 
   const sortedJogs = useMemo(() => [...jogs].sort((a, b) => a.order - b.order), [jogs]);
   const defaultJogId = useMemo(
@@ -67,6 +68,16 @@ export function JogsList() {
         </p>
       )}
 
+      <div className="mb-4 flex shrink-0 items-center">
+        <button
+          type="button"
+          onClick={() => setShowNewJog(true)}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
+          New jog
+        </button>
+      </div>
+
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
@@ -105,6 +116,8 @@ export function JogsList() {
       </div>
 
       {editingJog && <JogModal jog={editingJog} onClose={() => setEditingJog(null)} onSaved={() => {}} />}
+
+      {showNewJog && <JogModal onClose={() => setShowNewJog(false)} onSaved={() => {}} />}
 
       {deletingJog && (
         <ConfirmModal

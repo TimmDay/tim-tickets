@@ -9,7 +9,6 @@ import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { GripIcon } from './GripIcon';
-import { JogModal } from './JogModal';
 import { JogSelect } from './JogSelect';
 import { TicketModal } from './TicketModal';
 import { TrashIcon } from './TrashIcon';
@@ -33,7 +32,6 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
-  const [showNewJog, setShowNewJog] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | null>(null);
 
   const jogNameById = useMemo(() => new Map(jogs.map((jog) => [jog.id, jog.name])), [jogs]);
@@ -166,13 +164,6 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           </select>
           <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNewJog(true)}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          New jog
-        </button>
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -235,8 +226,6 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           onDeleted={handleDeleted}
         />
       )}
-
-      {showNewJog && <JogModal onClose={() => setShowNewJog(false)} onSaved={(jogId) => setJogFilter(jogId)} />}
 
       {deletingTicket && (
         <ConfirmModal

@@ -196,6 +196,16 @@ export async function addComment(ticketId: string, body: string): Promise<Commen
   return comment;
 }
 
+export async function deleteComment(ticketId: string, commentId: string): Promise<void> {
+  const ref = ticketsCollection().doc(ticketId);
+  const doc = await ref.get();
+  if (!doc.exists) return;
+
+  const comments: Comment[] = doc.data()?.comments ?? [];
+  const remaining = comments.filter((comment) => comment.id !== commentId);
+  await ref.update({ comments: remaining, updatedAt: new Date().toISOString() });
+}
+
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
 const LOGIN_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 

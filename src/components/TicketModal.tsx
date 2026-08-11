@@ -2,7 +2,9 @@
 
 import { SubmitEvent, useState } from 'react';
 import { ChevronDownIcon } from './ChevronDownIcon';
+import { ConfirmModal } from './ConfirmModal';
 import { JogSelect } from './JogSelect';
+import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
 import { Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
@@ -31,6 +33,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [comments, setComments] = useState<Comment[]>(ticket?.comments ?? []);
   const [newComment, setNewComment] = useState('');
   const [addingComment, setAddingComment] = useState(false);
+  const [deletingComment, setDeletingComment] = useState<Comment | null>(null);
 
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -93,6 +96,16 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     } finally {
       setAddingComment(false);
     }
+  }
+
+  async function confirmDeleteComment() {
+    if (!deletingComment || !ticket) return;
+    const commentId = deletingComment.id;
+    setDeletingComment(null);
+    const updatedComments = comments.filter((comment) => comment.id !== commentId);
+    setComments(updatedComments);
+    onSaved({ ...ticket, comments: updatedComments });
+    await fetch(`/api/tickets/${ticket.id}/comments/${commentId}`, { method: 'DELETE' });
   }
 
   async function handleDelete() {
@@ -214,9 +227,9 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   type="button"
                   onClick={handleDelete}
                   disabled={saving}
-                  className="text-sm text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                  className="text-sm text-gray-600 hover:underline disabled:opacity-50 dark:text-gray-400"
                 >
-                  Delete
+                  Delete ticket
                 </button>
               )}
             </div>
@@ -245,7 +258,15 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             <ul className="mb-2 max-h-40 space-y-2 overflow-y-auto">
               {comments.length === 0 && <li className="text-sm text-gray-400 dark:text-gray-500">No comments yet.</li>}
               {comments.map((comment) => (
-                <li key={comment.id} className="rounded-md bg-gray-50 p-2 text-sm dark:bg-gray-800">
+                <li key={comment.id} className="relative rounded-md bg-gray-50 p-2 pr-7 text-sm dark:bg-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingComment(comment)}
+                    aria-label="Delete comment"
+                    className="absolute top-1.5 right-1.5 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
                   <p className="text-gray-800 dark:text-gray-200">{comment.body}</p>
                   <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                     {new Date(comment.createdAt).toLocaleString()}
@@ -278,6 +299,17 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           </div>
         )}
       </div>
+
+      {deletingComment && (
+        <div onClick={(event) => event.stopPropagation()}>
+          <ConfirmModal
+            title="Delete comment"
+            message="Delete this comment? This cannot be undone."
+            onConfirm={confirmDeleteComment}
+            onCancel={() => setDeletingComment(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }

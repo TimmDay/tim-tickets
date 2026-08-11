@@ -1,0 +1,31 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { deleteTicket, updateTicket } from '@/lib/firestore';
+
+const updateTicketSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  body: z.string().optional(),
+  status: z.enum(['todo', 'in_progress', 'blocked', 'in_review', 'done']).optional(),
+  jogId: z.string().min(1).optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  dueDate: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await request.json().catch(() => null);
+  const parsed = updateTicketSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  await updateTicket(id, parsed.data);
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await deleteTicket(id);
+  return NextResponse.json({ ok: true });
+}

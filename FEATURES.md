@@ -52,15 +52,19 @@ interface Ticket {
 
 ## Jog Fields
 
-Name only, no lifecycle (no start/complete/archive states).
+Name, optional start/end dates, no lifecycle (no start/complete/archive states).
 
 ```ts
 interface Jog {
   id: string;
   name: string;
+  startDate: string | null; // ISO date, optional
+  endDate: string | null;   // ISO date, optional
   createdAt: string;
 }
 ```
+
+Start/end dates are set via a small optional date-range picker inside the "+ New Jog" inline creation form; when set, the range is shown next to the jog selector on the board.
 
 Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via an `ensureDefaultJog()` check on the jogs-read path — created lazily the first time the `jogs` collection is empty, no manual seed script. New tickets default to whichever jog is selected in the creation modal (itself defaulting to "Default Jog").
 
@@ -68,7 +72,7 @@ Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via a
 
 - Single shared password via `APP_PASSWORD` env var — no user accounts.
 - Login page posts to an API route; on match, sets an httpOnly cookie whose value is an HMAC (using `APP_SESSION_SECRET`) — no server-side session store needed.
-- `middleware.ts` redirects to `/login` when the cookie is missing/invalid, exempting `/login` and the login API route.
+- `src/proxy.ts` (Next.js 16 renamed the `middleware.ts` convention to `proxy.ts`) redirects to `/login` when the cookie is missing/invalid, exempting `/login` and the login API route.
 
 ## Data Model / Architecture
 
@@ -85,12 +89,13 @@ _TBD — GitHub + Vercel auto-deploy vs Vercel CLI; GCP Firestore project setup 
 - [x] Decide board columns
 - [x] Decide ticket fields
 - [x] Decide auth flow details
-- [ ] Build ticket/jog data layer (`src/lib/types.ts`, `src/lib/firestore.ts`)
-- [ ] Build auth (`src/lib/auth.ts`, `middleware.ts`, `/login`, auth API routes)
-- [ ] Build API routes (`/api/tickets`, `/api/tickets/[id]`, `/api/jogs`)
-- [ ] Build `JogsContext`, `AppHeader`, `TicketModal`, `JogSelect`
-- [ ] Build Jog board (`/`, `JogBoard`, `JogColumn`, `TicketCard`, drag-and-drop)
-- [ ] Build Backlog page (`/backlog`, `BacklogTable`)
-- [ ] Set up GCP project + Firestore
+- [x] Build ticket/jog data layer (`src/lib/types.ts`, `src/lib/firestore.ts`)
+- [x] Build auth (`src/lib/auth.ts`, `src/proxy.ts`, `/login`, auth API routes)
+- [x] Build API routes (`/api/tickets`, `/api/tickets/[id]`, `/api/jogs`)
+- [x] Build `JogsContext`, `AppHeader`, `TicketModal`, `JogSelect`
+- [x] Build Jog board (`/`, `JogBoard`, `JogColumn`, `TicketCard`, drag-and-drop)
+- [x] Build Backlog page (`/backlog`, `BacklogTable`)
+- [x] `npm run build` / `npm run lint` pass; auth flow smoke-tested locally
+- [ ] Set up GCP project + Firestore (blocks actually using the app — board/backlog pages 500 until `GCP_PROJECT_ID`/`GCP_CLIENT_EMAIL`/`GCP_PRIVATE_KEY` are set)
 - [ ] Set up Vercel project + env vars
 - [ ] Decide deployment method

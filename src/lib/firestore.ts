@@ -195,3 +195,44 @@ export async function addComment(ticketId: string, body: string): Promise<Commen
     .update({ comments: FieldValue.arrayUnion(comment), updatedAt: comment.createdAt });
   return comment;
 }
+
+const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
+const LOGIN_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+const loginAttemptsCollection = () => getFirestore().collection('loginAttempts');
+
+function loginAttemptsDocId(ip: string): string {
+  return encodeURIComponent(ip);
+}
+
+export async function isLoginRateLimited(ip: string): Promise<boolean> {
+  const doc = await loginAttemptsCollection().doc(loginAttemptsDocId(ip)).get();
+  if (!doc.exists) return false;
+  const data = doc.data()!;
+  const windowAge = Date.now() - new Date(data.windowStart).getTime();
+  if (windowAge > LOGIN_RATE_LIMIT_WINDOW_MS) return false;
+  return data.count >= LOGIN_RATE_LIMIT_MAX_ATTEMPTS;
+}
+
+export async function recordFailedLogin(ip: string): Promise<void> {
+  const ref = loginAttemptsCollection().doc(loginAttemptsDocId(ip));
+  const doc = await ref.get();
+  const now = new Date().toISOString();
+
+  if (!doc.exists) {
+    await ref.set({ count: 1, windowStart: now });
+    return;
+  }
+
+  const data = doc.data()!;
+  const windowAge = Date.now() - new Date(data.windowStart).getTime();
+  if (windowAge > LOGIN_RATE_LIMIT_WINDOW_MS) {
+    await ref.set({ count: 1, windowStart: now });
+  } else {
+    await ref.update({ count: FieldValue.increment(1) });
+  }
+}
+
+export async function clearLoginAttempts(ip: string): Promise<void> {
+  await loginAttemptsCollection().doc(loginAttemptsDocId(ip)).delete();
+}

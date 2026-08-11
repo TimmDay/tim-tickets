@@ -23,6 +23,9 @@ export default function LoginPage() {
     if (response.ok) {
       router.push('/');
       router.refresh();
+    } else if (response.status === 429) {
+      setError('Too many attempts. Try again in a bit.');
+      setSubmitting(false);
     } else {
       setError('Incorrect password');
       setSubmitting(false);

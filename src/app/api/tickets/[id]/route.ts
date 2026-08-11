@@ -10,6 +10,7 @@ const updateTicketSchema = z.object({
   priority: z.enum(['low', 'medium', 'high']).optional(),
   dueDate: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
+  order: z.number().optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

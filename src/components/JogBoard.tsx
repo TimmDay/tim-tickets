@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useJogs } from '@/lib/JogsContext';
+import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
 import { TicketModal } from './TicketModal';
-import { STATUSES, Ticket, TicketStatus } from '@/lib/types';
+import { ORDER_GAP, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
@@ -76,26 +77,43 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       if (insertIndex === -1) insertIndex = withoutActive.length;
     }
 
-    const updatedActive: Ticket = { ...activeTicket, status: targetStatus };
-    const reordered = [...withoutActive.slice(0, insertIndex), updatedActive, ...withoutActive.slice(insertIndex)].map(
-      (ticket, index) => ({ ...ticket, order: index }),
-    );
+    const before = withoutActive[insertIndex - 1]?.order ?? null;
+    const after = withoutActive[insertIndex]?.order ?? null;
+    const newOrder = computeOrderBetween(before, after);
 
-    setTickets(reordered);
+    if (needsRebalance(before, after, newOrder)) {
+      const updatedActive: Ticket = { ...activeTicket, status: targetStatus };
+      const rebalanced = [
+        ...withoutActive.slice(0, insertIndex),
+        updatedActive,
+        ...withoutActive.slice(insertIndex),
+      ].map((ticket, index) => ({ ...ticket, order: index * ORDER_GAP }));
 
-    await fetch('/api/tickets/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: reordered.map((t) => t.id) }),
-    });
+      setTickets(rebalanced);
 
-    if (statusChanged) {
-      await fetch(`/api/tickets/${activeId}`, {
-        method: 'PATCH',
+      await fetch('/api/tickets/reorder', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetStatus }),
+        body: JSON.stringify({ order: rebalanced.map((t) => t.id) }),
       });
+
+      if (statusChanged) {
+        await fetch(`/api/tickets/${activeId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: targetStatus }),
+        });
+      }
+      return;
     }
+
+    setTickets((prev) => prev.map((t) => (t.id === activeId ? { ...t, order: newOrder, status: targetStatus } : t)));
+
+    await fetch(`/api/tickets/${activeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: newOrder, status: targetStatus }),
+    });
   }
 
   function handleSaved(ticket: Ticket) {

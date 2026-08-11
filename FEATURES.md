@@ -91,6 +91,10 @@ Start/end dates are set via a small optional date-range picker inside the jog cr
 
 Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via an `ensureDefaultJog()` check on the jogs-read path — created lazily the first time the `jogs` collection is empty, no manual seed script. It's identified for protection purposes (can't be deleted) by earliest `createdAt`, independent of its display `order`. New tickets default to whichever jog is selected in the creation modal (itself defaulting to "Default Jog").
 
+## Ordering mechanism
+
+`order` is a fractional index (`src/lib/ordering.ts`), not a sequential position. On drag, only the moved item is given a new value — the midpoint between its new neighbors' `order` values — and persisted via a single `PATCH` to that one ticket/jog. This avoids rewriting every document on every drag (the original implementation renumbered the whole list each time). If repeated inserts into the same slot ever shrink a gap below floating-point precision, that's detected (`needsRebalance`) and falls back to a full renumber via the `/api/tickets/reorder` / `/api/jogs/reorder` bulk endpoints, spacing everything back out by `ORDER_GAP` — an edge case that shouldn't occur in normal use (verified it takes 1000+ repeated same-slot inserts to trigger).
+
 ## Auth Flow
 
 - Single shared password via `APP_PASSWORD` env var — no user accounts.

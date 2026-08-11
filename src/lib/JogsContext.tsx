@@ -1,13 +1,14 @@
 'use client';
 
 import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
-import { Jog } from './types';
+import { Jog, ORDER_GAP } from './types';
 
 interface JogsContextValue {
   jogs: Jog[];
   refresh: () => Promise<void>;
   createJog: (name: string, startDate?: string | null, endDate?: string | null) => Promise<Jog>;
   updateJog: (id: string, name: string, startDate: string | null, endDate: string | null) => Promise<void>;
+  updateJogOrder: (id: string, order: number) => Promise<void>;
   deleteJog: (id: string) => Promise<void>;
   reorderJogs: (orderedIds: string[]) => Promise<void>;
 }
@@ -58,6 +59,15 @@ export function JogsProvider({
     [],
   );
 
+  const updateJogOrder = useCallback(async (id: string, order: number) => {
+    setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, order } : jog)));
+    await fetch(`/api/jogs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    });
+  }, []);
+
   const deleteJog = useCallback(async (id: string) => {
     const response = await fetch(`/api/jogs/${id}`, { method: 'DELETE' });
     if (!response.ok) {
@@ -70,7 +80,7 @@ export function JogsProvider({
   const reorderJogs = useCallback(async (orderedIds: string[]) => {
     setJogs((prev) => {
       const byId = new Map(prev.map((jog) => [jog.id, jog]));
-      return orderedIds.map((id, index) => ({ ...byId.get(id)!, order: index }));
+      return orderedIds.map((id, index) => ({ ...byId.get(id)!, order: index * ORDER_GAP }));
     });
     await fetch('/api/jogs/reorder', {
       method: 'POST',
@@ -80,7 +90,7 @@ export function JogsProvider({
   }, []);
 
   return (
-    <JogsContext.Provider value={{ jogs, refresh, createJog, updateJog, deleteJog, reorderJogs }}>
+    <JogsContext.Provider value={{ jogs, refresh, createJog, updateJog, updateJogOrder, deleteJog, reorderJogs }}>
       {children}
     </JogsContext.Provider>
   );

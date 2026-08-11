@@ -5,6 +5,7 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useS
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useJogs } from '@/lib/JogsContext';
+import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ConfirmModal } from './ConfirmModal';
 import { GripIcon } from './GripIcon';
 import { JogModal } from './JogModal';
@@ -12,7 +13,7 @@ import { TrashIcon } from './TrashIcon';
 import { Jog } from '@/lib/types';
 
 export function JogsList() {
-  const { jogs, deleteJog, reorderJogs } = useJogs();
+  const { jogs, deleteJog, reorderJogs, updateJogOrder } = useJogs();
   const [editingJog, setEditingJog] = useState<Jog | null>(null);
   const [deletingJog, setDeletingJog] = useState<Jog | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -33,8 +34,18 @@ export function JogsList() {
     const newIndex = sortedJogs.findIndex((jog) => jog.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(sortedJogs, oldIndex, newIndex);
-    await reorderJogs(reordered.map((jog) => jog.id));
+    const moved = arrayMove(sortedJogs, oldIndex, newIndex);
+    const movedIndex = moved.findIndex((jog) => jog.id === active.id);
+    const before = moved[movedIndex - 1]?.order ?? null;
+    const after = moved[movedIndex + 1]?.order ?? null;
+    const newOrder = computeOrderBetween(before, after);
+
+    if (needsRebalance(before, after, newOrder)) {
+      await reorderJogs(moved.map((jog) => jog.id));
+      return;
+    }
+
+    await updateJogOrder(active.id as string, newOrder);
   }
 
   async function confirmDelete() {

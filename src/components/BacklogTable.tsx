@@ -5,13 +5,14 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useS
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useJogs } from '@/lib/JogsContext';
+import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ConfirmModal } from './ConfirmModal';
 import { GripIcon } from './GripIcon';
 import { JogModal } from './JogModal';
 import { JogSelect } from './JogSelect';
 import { TicketModal } from './TicketModal';
 import { TrashIcon } from './TrashIcon';
-import { STATUSES, Ticket } from '@/lib/types';
+import { ORDER_GAP, STATUSES, Ticket } from '@/lib/types';
 
 type SortKey = 'manual' | 'title' | 'jog' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
@@ -112,17 +113,29 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
     const newIndex = visibleTickets.findIndex((t) => t.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(visibleTickets, oldIndex, newIndex).map((ticket, index) => ({
-      ...ticket,
-      order: index,
-    }));
+    const moved = arrayMove(visibleTickets, oldIndex, newIndex);
+    const movedIndex = moved.findIndex((t) => t.id === active.id);
+    const before = moved[movedIndex - 1]?.order ?? null;
+    const after = moved[movedIndex + 1]?.order ?? null;
+    const newOrder = computeOrderBetween(before, after);
 
-    setTickets(reordered);
+    if (needsRebalance(before, after, newOrder)) {
+      const rebalanced = moved.map((ticket, index) => ({ ...ticket, order: index * ORDER_GAP }));
+      setTickets(rebalanced);
+      await fetch('/api/tickets/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: rebalanced.map((t) => t.id) }),
+      });
+      return;
+    }
 
-    await fetch('/api/tickets/reorder', {
-      method: 'POST',
+    setTickets((prev) => prev.map((t) => (t.id === active.id ? { ...t, order: newOrder } : t)));
+
+    await fetch(`/api/tickets/${active.id}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: reordered.map((t) => t.id) }),
+      body: JSON.stringify({ order: newOrder }),
     });
   }
 

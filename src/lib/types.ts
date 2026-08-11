@@ -47,3 +47,5 @@ export const PRIORITIES: { value: Priority; label: string }[] = [
 ];
 
 export const DEFAULT_JOG_NAME = 'Default Jog';
+
+export const ORDER_GAP = 1000;

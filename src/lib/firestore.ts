@@ -1,5 +1,5 @@
 import { FieldValue, Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
-import { Comment, DEFAULT_JOG_NAME, Jog, Priority, Ticket, TicketStatus } from './types';
+import { Comment, DEFAULT_JOG_NAME, Jog, ORDER_GAP, Priority, Ticket, TicketStatus } from './types';
 
 let firestore: Firestore | null = null;
 
@@ -82,10 +82,12 @@ export async function createJog(
   return { id: ref.id, ...data };
 }
 
+/** Rebalances the given jogs to evenly-spaced order values. Only needed when
+ * fractional-index gaps between neighbors have collapsed too far to bisect. */
 export async function reorderJogs(orderedIds: string[]): Promise<void> {
   const batch = getFirestore().batch();
   orderedIds.forEach((id, index) => {
-    batch.update(jogsCollection().doc(id), { order: index });
+    batch.update(jogsCollection().doc(id), { order: index * ORDER_GAP });
   });
   await batch.commit();
 }
@@ -94,6 +96,7 @@ export interface UpdateJogInput {
   name?: string;
   startDate?: string | null;
   endDate?: string | null;
+  order?: number;
 }
 
 export async function updateJog(id: string, input: UpdateJogInput): Promise<void> {
@@ -149,11 +152,13 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
   return { id: ref.id, ...data };
 }
 
+/** Rebalances the given tickets to evenly-spaced order values. Only needed when
+ * fractional-index gaps between neighbors have collapsed too far to bisect. */
 export async function reorderTickets(orderedIds: string[]): Promise<void> {
   const batch = getFirestore().batch();
   const now = new Date().toISOString();
   orderedIds.forEach((id, index) => {
-    batch.update(ticketsCollection().doc(id), { order: index, updatedAt: now });
+    batch.update(ticketsCollection().doc(id), { order: index * ORDER_GAP, updatedAt: now });
   });
   await batch.commit();
 }
@@ -166,6 +171,7 @@ export interface UpdateTicketInput {
   priority?: Priority;
   dueDate?: string | null;
   tags?: string[];
+  order?: number;
 }
 
 export async function updateTicket(id: string, input: UpdateTicketInput): Promise<void> {

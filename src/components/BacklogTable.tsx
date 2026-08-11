@@ -151,12 +151,12 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search title…"
-          className="w-64 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          className="w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
         <select
           value={jogFilter}
           onChange={(event) => setJogFilter(event.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         >
           <option value="all">All jogs</option>
           {jogs.map((jog) => (
@@ -168,15 +168,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
         <button
           type="button"
           onClick={() => setShowNewJog(true)}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           New jog
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
         <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600">
+          <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
             <tr>
               <th className="w-8 px-2 py-2" />
               <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('title')}>
@@ -209,7 +209,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
                 ))}
                 {visibleTickets.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
+                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
                       No tickets found.
                     </td>
                   </tr>
@@ -262,7 +262,7 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
     <tr
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 ${isDragging ? 'opacity-50' : ''}`}
+      className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60 ${isDragging ? 'opacity-50' : ''}`}
     >
       <td className="px-2 py-2">
         <button
@@ -270,7 +270,9 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
           {...attributes}
           {...listeners}
           className={`flex items-center justify-center ${
-            disabled ? 'cursor-not-allowed text-gray-200' : 'cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing'
+            disabled
+              ? 'cursor-not-allowed text-gray-200 dark:text-gray-700'
+              : 'cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing dark:text-gray-500 dark:hover:text-gray-300'
           }`}
           title={disabled ? 'Switch to default order (no search/filter) to reorder' : 'Drag to reorder'}
         >
@@ -278,18 +280,27 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
         </button>
       </td>
       <td className="px-3 py-2">
-        <button type="button" onClick={onEdit} className="text-left font-medium text-gray-900 hover:underline">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-left font-medium text-gray-900 hover:underline dark:text-gray-100"
+        >
           {ticket.title}
         </button>
       </td>
-      <td className="px-3 py-2 text-gray-600">{statusLabel}</td>
-      <td className="px-3 py-2 text-gray-600 capitalize">{ticket.priority}</td>
+      <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{statusLabel}</td>
+      <td className="px-3 py-2 text-gray-600 capitalize dark:text-gray-400">{ticket.priority}</td>
       <td className="px-3 py-2">
         <JogSelect value={ticket.jogId} onChange={onReassign} className="w-48" />
       </td>
-      <td className="px-3 py-2 text-gray-500">{new Date(ticket.createdAt).toLocaleDateString()}</td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{new Date(ticket.createdAt).toLocaleDateString()}</td>
       <td className="px-2 py-2 text-right">
-        <button type="button" onClick={onDelete} className="text-gray-400 hover:text-red-600" aria-label="Delete ticket">
+        <button
+          type="button"
+          onClick={onDelete}
+          className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+          aria-label="Delete ticket"
+        >
           <TrashIcon className="h-4 w-4" />
         </button>
       </td>

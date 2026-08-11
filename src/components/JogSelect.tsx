@@ -46,7 +46,7 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm"
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
       >
         {selected?.name ?? 'Select jog'}
       </button>
@@ -54,15 +54,17 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={closeAndReset} />
-          <div className="absolute z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+          <div className="absolute z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
             <ul className="max-h-48 overflow-auto">
               {jogs.map((jog) => (
                 <li key={jog.id}>
                   <button
                     type="button"
                     onClick={() => selectJog(jog)}
-                    className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 ${
-                      jog.id === value ? 'font-medium text-gray-900' : 'text-gray-700'
+                    className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                      jog.id === value
+                        ? 'font-medium text-gray-900 dark:text-gray-100'
+                        : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
                     {jog.name}
@@ -70,7 +72,7 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
                 </li>
               ))}
             </ul>
-            <div className="border-t border-gray-100 p-2">
+            <div className="border-t border-gray-100 p-2 dark:border-gray-700">
               {adding ? (
                 <div className="space-y-1.5">
                   <input
@@ -84,7 +86,7 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
                       }
                     }}
                     placeholder="Jog name"
-                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                   />
                   <div className="flex gap-1">
                     <input
@@ -92,20 +94,20 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
                       value={newStartDate}
                       onChange={(event) => setNewStartDate(event.target.value)}
                       title="Start date (optional)"
-                      className="w-1/2 rounded border border-gray-300 px-2 py-1 text-xs text-gray-600"
+                      className="w-1/2 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                     />
                     <input
                       type="date"
                       value={newEndDate}
                       onChange={(event) => setNewEndDate(event.target.value)}
                       title="End date (optional)"
-                      className="w-1/2 rounded border border-gray-300 px-2 py-1 text-xs text-gray-600"
+                      className="w-1/2 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleCreate}
-                    className="w-full rounded bg-gray-900 px-2 py-1 text-sm text-white"
+                    className="w-full rounded bg-gray-900 px-2 py-1 text-sm text-white dark:bg-gray-100 dark:text-gray-900"
                   >
                     Add
                   </button>
@@ -114,7 +116,7 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
                 <button
                   type="button"
                   onClick={() => setAdding(true)}
-                  className="w-full rounded px-2 py-1 text-left text-sm text-gray-600 hover:bg-gray-100"
+                  className="w-full rounded px-2 py-1 text-left text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                 >
                   + New Jog
                 </button>

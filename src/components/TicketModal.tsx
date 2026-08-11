@@ -108,45 +108,45 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
           {isEditing ? 'Edit ticket' : 'New ticket'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               autoFocus
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Body</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
             <textarea
               value={body}
               onChange={(event) => setBody(event.target.value)}
               rows={4}
-              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Jog</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
               <JogSelect value={jogId} onChange={setJogId} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Priority</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
               <select
                 value={priority}
                 onChange={(event) => setPriority(event.target.value as Priority)}
-                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               >
                 {PRIORITIES.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -159,26 +159,26 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Due date</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
               <input
                 type="date"
                 value={dueDate ?? ''}
                 onChange={(event) => setDueDate(event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tags</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
               <input
                 value={tagsText}
                 onChange={(event) => setTagsText(event.target.value)}
                 placeholder="comma, separated"
-                className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex items-center justify-between pt-2">
             <div>
@@ -187,7 +187,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   type="button"
                   onClick={handleDelete}
                   disabled={saving}
-                  className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                  className="text-sm text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
                 >
                   Delete
                 </button>
@@ -197,14 +197,14 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
               >
                 {saving ? 'Saving…' : 'Save'}
               </button>
@@ -213,14 +213,16 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
         </form>
 
         {isEditing && (
-          <div className="mt-4 border-t border-gray-100 pt-4">
-            <h3 className="mb-2 text-sm font-medium text-gray-700">Comments</h3>
+          <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Comments</h3>
             <ul className="mb-2 max-h-40 space-y-2 overflow-y-auto">
-              {comments.length === 0 && <li className="text-sm text-gray-400">No comments yet.</li>}
+              {comments.length === 0 && <li className="text-sm text-gray-400 dark:text-gray-500">No comments yet.</li>}
               {comments.map((comment) => (
-                <li key={comment.id} className="rounded-md bg-gray-50 p-2 text-sm">
-                  <p className="text-gray-800">{comment.body}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+                <li key={comment.id} className="rounded-md bg-gray-50 p-2 text-sm dark:bg-gray-800">
+                  <p className="text-gray-800 dark:text-gray-200">{comment.body}</p>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                    {new Date(comment.createdAt).toLocaleString()}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -235,13 +237,13 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   }
                 }}
                 placeholder="Add a comment…"
-                className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               />
               <button
                 type="button"
                 onClick={handleAddComment}
                 disabled={addingComment || !newComment.trim()}
-                className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
               >
                 Add
               </button>

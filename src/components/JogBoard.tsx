@@ -131,7 +131,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       <div className="mb-4 flex shrink-0 items-center gap-3">
         <JogSelect value={selectedJogId} onChange={setSelectedJogId} className="w-64" />
         {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             {selectedJog.startDate ?? '…'} → {selectedJog.endDate ?? '…'}
           </span>
         )}

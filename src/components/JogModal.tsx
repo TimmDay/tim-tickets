@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { SubmitEvent, useState } from 'react';
 import { useJogs } from '@/lib/JogsContext';
 import { Jog } from '@/lib/types';
 
@@ -19,7 +19,7 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
   const [endDate, setEndDate] = useState(jog?.endDate ?? '');
   const [saving, setSaving] = useState(false);
 
-  async function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     if (!name.trim()) return;
     setSaving(true);

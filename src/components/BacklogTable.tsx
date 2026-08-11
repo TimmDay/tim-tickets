@@ -6,6 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { GripIcon } from './GripIcon';
 import { JogModal } from './JogModal';
@@ -153,18 +154,21 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           placeholder="Search title…"
           className="w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
-        <select
-          value={jogFilter}
-          onChange={(event) => setJogFilter(event.target.value)}
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        >
-          <option value="all">All jogs</option>
-          {jogs.map((jog) => (
-            <option key={jog.id} value={jog.id}>
-              {jog.name}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={jogFilter}
+            onChange={(event) => setJogFilter(event.target.value)}
+            className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          >
+            <option value="all">All jogs</option>
+            {jogs.map((jog) => (
+              <option key={jog.id} value={jog.id}>
+                {jog.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+        </div>
         <button
           type="button"
           onClick={() => setShowNewJog(true)}

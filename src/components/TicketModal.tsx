@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { SubmitEvent, useState } from 'react';
+import { ChevronDownIcon } from './ChevronDownIcon';
 import { JogSelect } from './JogSelect';
 import { useJogs } from '@/lib/JogsContext';
 import { Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
@@ -31,7 +32,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [newComment, setNewComment] = useState('');
   const [addingComment, setAddingComment] = useState(false);
 
-  async function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     if (!title.trim() || !jogId) return;
     setSaving(true);
@@ -120,17 +121,20 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           {isEditing && (
             <div className="lg:hidden">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as TicketStatus)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              >
-                {STATUSES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as TicketStatus)}
+                  className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  {STATUSES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              </div>
             </div>
           )}
 
@@ -162,18 +166,21 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-              <select
-                value={priority ?? ''}
-                onChange={(event) => setPriority(event.target.value === '' ? null : (event.target.value as Priority))}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              >
-                <option value="">No priority</option>
-                {PRIORITIES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={priority ?? ''}
+                  onChange={(event) => setPriority(event.target.value === '' ? null : (event.target.value as Priority))}
+                  className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  <option value="">No priority</option>
+                  {PRIORITIES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              </div>
             </div>
           </div>
 

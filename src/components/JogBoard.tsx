@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
@@ -9,6 +9,8 @@ import { JogColumn } from './JogColumn';
 import { TicketModal } from './TicketModal';
 import { ORDER_GAP, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
+const SELECTED_JOG_STORAGE_KEY = 'tt_selected_jog_id';
+
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
   const [tickets, setTickets] = useState(initialTickets);
@@ -16,15 +18,42 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [filterText, setFilterText] = useState('');
+  const hasRestoredSelection = useRef(false);
 
   if (initialTickets !== prevInitialTickets) {
     setPrevInitialTickets(initialTickets);
     setTickets(initialTickets);
   }
 
+  // Restore a previously-selected jog from localStorage once the jogs list is available.
+  // This must happen post-mount (not during the initial render) since localStorage isn't
+  // available during server rendering and reading it there would cause a hydration mismatch.
+  useEffect(() => {
+    if (hasRestoredSelection.current) return;
+    hasRestoredSelection.current = true;
+    const stored = localStorage.getItem(SELECTED_JOG_STORAGE_KEY);
+    if (!stored) return;
+    if (jogs.some((jog) => jog.id === stored)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring from localStorage genuinely cannot happen during render without a hydration mismatch
+      setSelectedJogId(stored);
+    } else {
+      // The jog this pointed to no longer exists (e.g. deleted since we last saved it) — drop the stale entry.
+      localStorage.removeItem(SELECTED_JOG_STORAGE_KEY);
+    }
+  }, [jogs]);
+
+  function handleSelectJog(jogId: string) {
+    setSelectedJogId(jogId);
+    localStorage.setItem(SELECTED_JOG_STORAGE_KEY, jogId);
+  }
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const selectedJog = jogs.find((jog) => jog.id === selectedJogId);
+  // Falls back to the first jog if the selected one is no longer valid (deleted, or restored
+  // from a stale localStorage entry before the jogs list loaded) — derived at use-time so no
+  // extra state/effect is needed to keep it in sync.
+  const effectiveJogId = jogs.some((jog) => jog.id === selectedJogId) ? selectedJogId : (jogs[0]?.id ?? '');
+  const selectedJog = jogs.find((jog) => jog.id === effectiveJogId);
 
   const ticketsByStatus = useMemo(() => {
     const grouped: Record<TicketStatus, Ticket[]> = {
@@ -37,7 +66,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     const sorted = [...tickets].sort((a, b) => a.order - b.order);
     const query = filterText.trim().toLowerCase();
     for (const ticket of sorted) {
-      if (ticket.jogId !== selectedJogId) continue;
+      if (ticket.jogId !== effectiveJogId) continue;
       if (query) {
         const matches =
           ticket.title.toLowerCase().includes(query) || ticket.tags.some((tag) => tag.toLowerCase().includes(query));
@@ -46,7 +75,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       grouped[ticket.status].push(ticket);
     }
     return grouped;
-  }, [tickets, selectedJogId, filterText]);
+  }, [tickets, effectiveJogId, filterText]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -135,7 +164,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex shrink-0 items-center gap-3">
-        <JogSelect value={selectedJogId} onChange={setSelectedJogId} className="w-64" />
+        <JogSelect value={effectiveJogId} onChange={handleSelectJog} className="w-64" />
         {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
           <span className="text-sm text-gray-500 dark:text-gray-400">
             {selectedJog.startDate ?? '…'} → {selectedJog.endDate ?? '…'}

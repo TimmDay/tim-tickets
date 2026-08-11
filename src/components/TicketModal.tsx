@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { JogSelect } from './JogSelect';
 import { useJogs } from '@/lib/JogsContext';
-import { Comment, PRIORITIES, Priority, Ticket } from '@/lib/types';
+import { Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 interface TicketModalProps {
   ticket?: Ticket | null;
@@ -21,6 +21,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [body, setBody] = useState(ticket?.body ?? '');
   const [jogId, setJogId] = useState(ticket?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
   const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? null);
+  const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
   const [dueDate, setDueDate] = useState(ticket?.dueDate ?? '');
   const [tagsText, setTagsText] = useState((ticket?.tags ?? []).join(', '));
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       body,
       jogId,
       priority,
+      status,
       dueDate: dueDate || null,
       tags,
     };
@@ -115,6 +117,23 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           {isEditing ? 'Edit ticket' : 'New ticket'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-3">
+          {isEditing && (
+            <div className="lg:hidden">
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value as TicketStatus)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              >
+                {STATUSES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
             <input

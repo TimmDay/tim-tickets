@@ -44,7 +44,7 @@ function toTicket(doc: QueryDocumentSnapshot): Ticket {
     body: data.body,
     status: data.status,
     jogId: data.jogId,
-    priority: data.priority,
+    priority: data.priority ?? null,
     dueDate: data.dueDate ?? null,
     tags: data.tags ?? [],
     comments: data.comments ?? [],
@@ -128,7 +128,7 @@ export interface CreateTicketInput {
   title: string;
   body: string;
   jogId: string;
-  priority: Priority;
+  priority: Priority | null;
   dueDate: string | null;
   tags: string[];
 }
@@ -168,7 +168,7 @@ export interface UpdateTicketInput {
   body?: string;
   status?: TicketStatus;
   jogId?: string;
-  priority?: Priority;
+  priority?: Priority | null;
   dueDate?: string | null;
   tags?: string[];
   order?: number;

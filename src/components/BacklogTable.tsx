@@ -289,7 +289,7 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
         </button>
       </td>
       <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{statusLabel}</td>
-      <td className="px-3 py-2 text-gray-600 capitalize dark:text-gray-400">{ticket.priority}</td>
+      <td className="px-3 py-2 text-gray-600 capitalize dark:text-gray-400">{ticket.priority ?? '—'}</td>
       <td className="px-3 py-2">
         <JogSelect value={ticket.jogId} onChange={onReassign} className="w-48" />
       </td>

@@ -6,7 +6,7 @@ const createTicketSchema = z.object({
   title: z.string().trim().min(1),
   body: z.string().default(''),
   jogId: z.string().min(1),
-  priority: z.enum(['low', 'medium', 'high']),
+  priority: z.enum(['low', 'medium', 'high']).nullable().default(null),
   dueDate: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),
 });

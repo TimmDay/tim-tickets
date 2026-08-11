@@ -4,9 +4,9 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Ticket } from '@/lib/types';
+import { Priority, Ticket } from '@/lib/types';
 
-const PRIORITY_COLORS: Record<Ticket['priority'], string> = {
+const PRIORITY_COLORS: Record<Priority, string> = {
   low: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
   medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
@@ -71,7 +71,9 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
         {ticket.title}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-1">
-        <span className={`rounded px-1.5 py-0.5 text-xs ${PRIORITY_COLORS[ticket.priority]}`}>{ticket.priority}</span>
+        {ticket.priority && (
+          <span className={`rounded px-1.5 py-0.5 text-xs ${PRIORITY_COLORS[ticket.priority]}`}>{ticket.priority}</span>
+        )}
         {ticket.tags.map((tag) => (
           <span key={tag} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
             {tag}

@@ -14,7 +14,7 @@ export interface Ticket {
   body: string;
   status: TicketStatus;
   jogId: string;
-  priority: Priority;
+  priority: Priority | null;
   dueDate: string | null;
   tags: string[];
   comments: Comment[];

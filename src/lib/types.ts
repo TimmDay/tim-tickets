@@ -2,6 +2,12 @@ export type TicketStatus = 'todo' | 'in_progress' | 'blocked' | 'in_review' | 'd
 
 export type Priority = 'low' | 'medium' | 'high';
 
+export interface Comment {
+  id: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface Ticket {
   id: string;
   title: string;
@@ -11,6 +17,8 @@ export interface Ticket {
   priority: Priority;
   dueDate: string | null;
   tags: string[];
+  comments: Comment[];
+  order: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +28,7 @@ export interface Jog {
   name: string;
   startDate: string | null;
   endDate: string | null;
+  order: number;
   createdAt: string;
 }
 

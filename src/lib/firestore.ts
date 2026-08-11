@@ -1,5 +1,5 @@
-import { Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
-import { DEFAULT_JOG_NAME, Jog, Priority, Ticket, TicketStatus } from './types';
+import { FieldValue, Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
+import { Comment, DEFAULT_JOG_NAME, Jog, Priority, Ticket, TicketStatus } from './types';
 
 let firestore: Firestore | null = null;
 
@@ -31,6 +31,7 @@ function toJog(doc: QueryDocumentSnapshot): Jog {
     name: data.name,
     startDate: data.startDate ?? null,
     endDate: data.endDate ?? null,
+    order: data.order ?? new Date(data.createdAt).getTime(),
     createdAt: data.createdAt,
   };
 }
@@ -46,6 +47,8 @@ function toTicket(doc: QueryDocumentSnapshot): Ticket {
     priority: data.priority,
     dueDate: data.dueDate ?? null,
     tags: data.tags ?? [],
+    comments: data.comments ?? [],
+    order: data.order ?? new Date(data.createdAt).getTime(),
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -57,7 +60,7 @@ export async function ensureDefaultJog(): Promise<Jog> {
     return toJog(snapshot.docs[0]);
   }
   const now = new Date().toISOString();
-  const data = { name: DEFAULT_JOG_NAME, startDate: null, endDate: null, createdAt: now };
+  const data = { name: DEFAULT_JOG_NAME, startDate: null, endDate: null, order: Date.now(), createdAt: now };
   const ref = await jogsCollection().add(data);
   return { id: ref.id, ...data };
 }
@@ -74,9 +77,43 @@ export async function createJog(
   endDate: string | null = null,
 ): Promise<Jog> {
   const now = new Date().toISOString();
-  const data = { name, startDate, endDate, createdAt: now };
+  const data = { name, startDate, endDate, order: Date.now(), createdAt: now };
   const ref = await jogsCollection().add(data);
   return { id: ref.id, ...data };
+}
+
+export async function reorderJogs(orderedIds: string[]): Promise<void> {
+  const batch = getFirestore().batch();
+  orderedIds.forEach((id, index) => {
+    batch.update(jogsCollection().doc(id), { order: index });
+  });
+  await batch.commit();
+}
+
+export interface UpdateJogInput {
+  name?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export async function updateJog(id: string, input: UpdateJogInput): Promise<void> {
+  await jogsCollection().doc(id).update({ ...input });
+}
+
+export async function deleteJog(id: string): Promise<void> {
+  const defaultJog = await ensureDefaultJog();
+  if (id === defaultJog.id) {
+    throw new Error('Cannot delete the default jog');
+  }
+
+  const orphaned = await ticketsCollection().where('jogId', '==', id).get();
+  const batch = getFirestore().batch();
+  const now = new Date().toISOString();
+  orphaned.docs.forEach((doc) => {
+    batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now });
+  });
+  batch.delete(jogsCollection().doc(id));
+  await batch.commit();
 }
 
 export async function getTickets(): Promise<Ticket[]> {
@@ -103,11 +140,22 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
     priority: input.priority,
     dueDate: input.dueDate,
     tags: input.tags,
+    comments: [] as Comment[],
+    order: Date.now(),
     createdAt: now,
     updatedAt: now,
   };
   const ref = await ticketsCollection().add(data);
   return { id: ref.id, ...data };
+}
+
+export async function reorderTickets(orderedIds: string[]): Promise<void> {
+  const batch = getFirestore().batch();
+  const now = new Date().toISOString();
+  orderedIds.forEach((id, index) => {
+    batch.update(ticketsCollection().doc(id), { order: index, updatedAt: now });
+  });
+  await batch.commit();
 }
 
 export interface UpdateTicketInput {
@@ -128,4 +176,16 @@ export async function updateTicket(id: string, input: UpdateTicketInput): Promis
 
 export async function deleteTicket(id: string): Promise<void> {
   await ticketsCollection().doc(id).delete();
+}
+
+export async function addComment(ticketId: string, body: string): Promise<Comment> {
+  const comment: Comment = {
+    id: crypto.randomUUID(),
+    body,
+    createdAt: new Date().toISOString(),
+  };
+  await ticketsCollection()
+    .doc(ticketId)
+    .update({ comments: FieldValue.arrayUnion(comment), updatedAt: comment.createdAt });
+  return comment;
 }

@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { JogSelect } from './JogSelect';
 import { useJogs } from '@/lib/JogsContext';
-import { PRIORITIES, Priority, Ticket } from '@/lib/types';
+import { Comment, PRIORITIES, Priority, Ticket } from '@/lib/types';
 
 interface TicketModalProps {
   ticket?: Ticket | null;
@@ -25,6 +25,10 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [tagsText, setTagsText] = useState((ticket?.tags ?? []).join(', '));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [comments, setComments] = useState<Comment[]>(ticket?.comments ?? []);
+  const [newComment, setNewComment] = useState('');
+  const [addingComment, setAddingComment] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -56,7 +60,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       if (!response.ok) throw new Error('Failed to save ticket');
 
       const saved: Ticket = isEditing
-        ? { ...(ticket as Ticket), ...payload, updatedAt: new Date().toISOString() }
+        ? { ...(ticket as Ticket), ...payload, comments, updatedAt: new Date().toISOString() }
         : await response.json();
 
       onSaved(saved);
@@ -65,6 +69,26 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       setError('Something went wrong saving this ticket.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAddComment() {
+    const body = newComment.trim();
+    if (!body || !ticket) return;
+    setAddingComment(true);
+    try {
+      const response = await fetch(`/api/tickets/${ticket.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      const comment: Comment = await response.json();
+      const updatedComments = [...comments, comment];
+      setComments(updatedComments);
+      setNewComment('');
+      onSaved({ ...ticket, comments: updatedComments });
+    } finally {
+      setAddingComment(false);
     }
   }
 
@@ -82,8 +106,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
           {isEditing ? 'Edit ticket' : 'New ticket'}
         </h2>
@@ -184,6 +211,43 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </div>
           </div>
         </form>
+
+        {isEditing && (
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            <h3 className="mb-2 text-sm font-medium text-gray-700">Comments</h3>
+            <ul className="mb-2 max-h-40 space-y-2 overflow-y-auto">
+              {comments.length === 0 && <li className="text-sm text-gray-400">No comments yet.</li>}
+              {comments.map((comment) => (
+                <li key={comment.id} className="rounded-md bg-gray-50 p-2 text-sm">
+                  <p className="text-gray-800">{comment.body}</p>
+                  <p className="mt-0.5 text-xs text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <input
+                value={newComment}
+                onChange={(event) => setNewComment(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleAddComment();
+                  }
+                }}
+                placeholder="Add a comment…"
+                className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleAddComment}
+                disabled={addingComment || !newComment.trim()}
+                className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

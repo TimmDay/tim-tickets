@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useJogs } from '@/lib/JogsContext';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
@@ -11,8 +11,14 @@ import { STATUSES, Ticket, TicketStatus } from '@/lib/types';
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
   const [tickets, setTickets] = useState(initialTickets);
+  const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+
+  if (initialTickets !== prevInitialTickets) {
+    setPrevInitialTickets(initialTickets);
+    setTickets(initialTickets);
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -26,7 +32,8 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       in_review: [],
       done: [],
     };
-    for (const ticket of tickets) {
+    const sorted = [...tickets].sort((a, b) => a.order - b.order);
+    for (const ticket of sorted) {
       if (ticket.jogId === selectedJogId) {
         grouped[ticket.status].push(ticket);
       }
@@ -37,22 +44,64 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over) return;
-    const ticketId = active.id as string;
-    const newStatus = over.id as TicketStatus;
-    const ticket = tickets.find((t) => t.id === ticketId);
-    if (!ticket || ticket.status === newStatus) return;
 
-    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t)));
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    if (activeId === overId) return;
 
-    await fetch(`/api/tickets/${ticketId}`, {
-      method: 'PATCH',
+    const activeTicket = tickets.find((t) => t.id === activeId);
+    if (!activeTicket) return;
+
+    const overIsColumn = STATUSES.some((s) => s.value === overId);
+    const targetStatus: TicketStatus = overIsColumn
+      ? (overId as TicketStatus)
+      : (tickets.find((t) => t.id === overId)?.status ?? activeTicket.status);
+    const statusChanged = activeTicket.status !== targetStatus;
+
+    const sorted = [...tickets].sort((a, b) => a.order - b.order);
+    const withoutActive = sorted.filter((t) => t.id !== activeId);
+
+    let insertIndex: number;
+    if (overIsColumn) {
+      let lastInColumnIndex = -1;
+      for (let i = withoutActive.length - 1; i >= 0; i--) {
+        if (withoutActive[i].status === targetStatus) {
+          lastInColumnIndex = i;
+          break;
+        }
+      }
+      insertIndex = lastInColumnIndex === -1 ? withoutActive.length : lastInColumnIndex + 1;
+    } else {
+      insertIndex = withoutActive.findIndex((t) => t.id === overId);
+      if (insertIndex === -1) insertIndex = withoutActive.length;
+    }
+
+    const updatedActive: Ticket = { ...activeTicket, status: targetStatus };
+    const reordered = [...withoutActive.slice(0, insertIndex), updatedActive, ...withoutActive.slice(insertIndex)].map(
+      (ticket, index) => ({ ...ticket, order: index }),
+    );
+
+    setTickets(reordered);
+
+    await fetch('/api/tickets/reorder', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ order: reordered.map((t) => t.id) }),
     });
+
+    if (statusChanged) {
+      await fetch(`/api/tickets/${activeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+    }
   }
 
   function handleSaved(ticket: Ticket) {
-    setTickets((prev) => (prev.some((t) => t.id === ticket.id) ? prev.map((t) => (t.id === ticket.id ? ticket : t)) : [...prev, ticket]));
+    setTickets((prev) =>
+      prev.some((t) => t.id === ticket.id) ? prev.map((t) => (t.id === ticket.id ? ticket : t)) : [...prev, ticket],
+    );
   }
 
   function handleDeleted(ticketId: string) {
@@ -60,8 +109,8 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   }
 
   return (
-    <div>
-      <div className="mb-4 flex items-center gap-3">
+    <div className="flex h-full flex-col">
+      <div className="mb-4 flex shrink-0 items-center gap-3">
         <JogSelect value={selectedJogId} onChange={setSelectedJogId} className="w-64" />
         {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
           <span className="text-sm text-gray-500">
@@ -70,9 +119,9 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
         )}
       </div>
 
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto">
-          <div className="grid min-w-[900px] grid-cols-5 gap-3">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <div className="min-h-0 flex-1 overflow-x-auto">
+          <div className="grid h-full min-w-[900px] grid-cols-5 gap-3">
             {STATUSES.map((status) => (
               <JogColumn
                 key={status.value}

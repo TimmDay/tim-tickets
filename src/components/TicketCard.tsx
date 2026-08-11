@@ -1,6 +1,6 @@
 'use client';
 
-import { useDraggable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Ticket } from '@/lib/types';
 
@@ -11,7 +11,7 @@ const PRIORITY_COLORS: Record<Ticket['priority'], string> = {
 };
 
 export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: ticket.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
 
   return (
     <div
@@ -19,12 +19,36 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
       {...listeners}
       {...attributes}
       onClick={onClick}
-      style={{ transform: CSS.Translate.toString(transform) }}
-      className={`cursor-pointer rounded-md border border-gray-200 bg-white p-2 text-sm shadow-sm hover:border-gray-300 ${
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`relative cursor-pointer rounded-md border border-gray-200 bg-white p-2 text-sm shadow-sm hover:border-gray-300 ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
-      <p className="font-medium text-gray-900">{ticket.title}</p>
+      <div
+        className="group absolute top-1 right-1"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <span className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-gray-400 hover:text-gray-600">
+          ⓘ
+        </span>
+        <div className="invisible absolute top-full right-0 z-10 mt-1 w-56 rounded-md border border-gray-200 bg-white p-2 text-xs shadow-lg group-hover:visible">
+          {ticket.comments.length === 0 ? (
+            <p className="text-gray-400">No comments yet.</p>
+          ) : (
+            <ul className="max-h-40 space-y-1.5 overflow-y-auto">
+              {ticket.comments.map((comment) => (
+                <li key={comment.id}>
+                  <p className="text-gray-700">{comment.body}</p>
+                  <p className="text-[10px] text-gray-400">{new Date(comment.createdAt).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <p className="pr-5 font-medium text-gray-900">{ticket.title}</p>
       <div className="mt-1 flex flex-wrap items-center gap-1">
         <span className={`rounded px-1.5 py-0.5 text-xs ${PRIORITY_COLORS[ticket.priority]}`}>{ticket.priority}</span>
         {ticket.tags.map((tag) => (

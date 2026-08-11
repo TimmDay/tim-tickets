@@ -7,6 +7,9 @@ interface JogsContextValue {
   jogs: Jog[];
   refresh: () => Promise<void>;
   createJog: (name: string, startDate?: string | null, endDate?: string | null) => Promise<Jog>;
+  updateJog: (id: string, name: string, startDate: string | null, endDate: string | null) => Promise<void>;
+  deleteJog: (id: string) => Promise<void>;
+  reorderJogs: (orderedIds: string[]) => Promise<void>;
 }
 
 const JogsContext = createContext<JogsContextValue | null>(null);
@@ -19,6 +22,12 @@ export function JogsProvider({
   initialJogs: Jog[];
 }) {
   const [jogs, setJogs] = useState<Jog[]>(initialJogs);
+  const [prevInitialJogs, setPrevInitialJogs] = useState(initialJogs);
+
+  if (initialJogs !== prevInitialJogs) {
+    setPrevInitialJogs(initialJogs);
+    setJogs(initialJogs);
+  }
 
   const refresh = useCallback(async () => {
     const response = await fetch('/api/jogs');
@@ -37,7 +46,44 @@ export function JogsProvider({
     return jog;
   }, []);
 
-  return <JogsContext.Provider value={{ jogs, refresh, createJog }}>{children}</JogsContext.Provider>;
+  const updateJog = useCallback(
+    async (id: string, name: string, startDate: string | null, endDate: string | null) => {
+      await fetch(`/api/jogs/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, startDate, endDate }),
+      });
+      setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, name, startDate, endDate } : jog)));
+    },
+    [],
+  );
+
+  const deleteJog = useCallback(async (id: string) => {
+    const response = await fetch(`/api/jogs/${id}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? 'Failed to delete jog');
+    }
+    setJogs((prev) => prev.filter((jog) => jog.id !== id));
+  }, []);
+
+  const reorderJogs = useCallback(async (orderedIds: string[]) => {
+    setJogs((prev) => {
+      const byId = new Map(prev.map((jog) => [jog.id, jog]));
+      return orderedIds.map((id, index) => ({ ...byId.get(id)!, order: index }));
+    });
+    await fetch('/api/jogs/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: orderedIds }),
+    });
+  }, []);
+
+  return (
+    <JogsContext.Provider value={{ jogs, refresh, createJog, updateJog, deleteJog, reorderJogs }}>
+      {children}
+    </JogsContext.Provider>
+  );
 }
 
 export function useJogs(): JogsContextValue {

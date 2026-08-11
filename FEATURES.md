@@ -6,35 +6,55 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 
 - Personal, single-user issue tracker inspired by Jira/Trello.
 - Terminology: a **"jog"** is functionally a sprint.
-- Two pages, both behind the password gate: **Jog board** (kanban, scoped to one jog) and **Backlog** (flat list of every ticket, Jira-style).
+- Three pages, all behind the password gate: **Current Jog** (kanban, scoped to one jog), **Backlog** (flat list of every ticket, Jira-style), **Jogs** (manage jogs).
 - Deployed on Vercel, data stored in GCP Firestore, single shared-password gate for access.
 
 ## Pages
 
-### `/` — Jog board
+### `/` — Current Jog board
 - Dropdown at the top selects which jog to view (defaults to "Default Jog" or the first jog).
 - Five fixed columns: `todo`, `in_progress`, `blocked`, `in_review`, `done`, populated with tickets whose `jogId` matches the selected jog.
-- Drag-and-drop between columns (via `@dnd-kit`) updates a ticket's `status`.
-- Clicking a card opens it in the edit modal (includes Delete).
-- Ordering within a column: by `createdAt` ascending — no separate manual-order field.
+- Cards are draggable both across columns (updates `status`) and within a column (reorders `order`), via `@dnd-kit/sortable`'s multi-container pattern.
+- Clicking a card opens it in the edit modal (includes Delete, and a Comments section — see below).
+- Columns fill the full remaining viewport height; each column's ticket list scrolls internally rather than growing the page.
 
 ### `/backlog` — Backlog list
 - Flat table of **all** tickets across all jogs.
-- Client-side text search (title substring match), filter by jog, sort by title / jog / created date (click column header to toggle asc/desc).
-- Each row has a jog-reassignment dropdown; selecting "+ New Jog" at the bottom reveals an inline name input to create a jog on the spot (no native browser `prompt()`).
+- Client-side text search (title substring match), filter by jog, sort by title / jog / created date (click column header to toggle asc/desc), or drag rows via a grip handle to set a manual order (only active when no search/filter is applied and no column sort is active — dragging while a column sort or filter is active would be ambiguous, so the handle is shown but disabled with an explanatory tooltip in that state).
+- Each row has a jog-reassignment dropdown; selecting "+ New Jog" at the bottom reveals an inline name input to create a jog on the spot (no native browser `prompt()`), plus a "New jog" button next to the filter dropdown that opens the same create/edit modal.
+- Each row has a delete icon (trash, right end) opening a confirmation modal before deleting.
+- Table fills the full remaining viewport height with internal scroll.
+
+### `/jogs` — Jogs list
+- Table of every jog: name, start date, end date.
+- Drag rows via a grip handle to reorder (persisted, always active — no competing sort/filter here).
+- Edit icon per row opens the same create/edit modal used for "+ New Jog"; editing only changes the jog's own name/dates, never its ID, so ticket membership (`ticket.jogId`) is untouched.
+- Delete icon per row opens a confirmation modal. The structurally-special "default jog" (earliest-created, guaranteed to always exist) cannot be deleted — its delete icon is disabled. Deleting any other jog reassigns its member tickets to the default jog rather than orphaning them.
+- Table fills the full remaining viewport height with internal scroll.
 
 ### Global "+ Add" button
-- Lives in the header, visible on both pages.
+- Lives in the header, visible on all three pages.
 - Opens a ticket-creation modal, reused for editing existing tickets.
 - Fields: title, body, jog (select, includes "+ New Jog"), priority, due date, tags (freeform comma-separated).
+- Clicking outside the modal (the backdrop) closes it, same as Cancel.
+
+### Comments
+- Tickets can have comments, added from the edit modal (list at the bottom + an add-comment input, independent of the main Save button).
+- Each ticket card on the board shows an info icon in its top-right corner; hovering it shows a popover with the ticket's comments.
 
 ## Ticket Fields
 
-`status` and `jogId` are independent — moving a ticket to a different jog does not change its status.
+`status` and `jogId` are independent — moving a ticket to a different jog does not change its status. `order` is a single global ranking used both for manual position in the Backlog list and, filtered by status, for position within a kanban column.
 
 ```ts
 type TicketStatus = 'todo' | 'in_progress' | 'blocked' | 'in_review' | 'done';
 type Priority = 'low' | 'medium' | 'high';
+
+interface Comment {
+  id: string;
+  body: string;
+  createdAt: string; // ISO
+}
 
 interface Ticket {
   id: string;
@@ -45,14 +65,16 @@ interface Ticket {
   priority: Priority;
   dueDate: string | null;  // ISO date
   tags: string[];
-  createdAt: string;       // ISO — backlog default sort + in-column ordering
+  comments: Comment[];
+  order: number;           // manual/backlog + per-column kanban ordering
+  createdAt: string;       // ISO
   updatedAt: string;       // ISO
 }
 ```
 
 ## Jog Fields
 
-Name, optional start/end dates, no lifecycle (no start/complete/archive states).
+Name, optional start/end dates, manual `order`, no lifecycle (no start/complete/archive states).
 
 ```ts
 interface Jog {
@@ -60,13 +82,14 @@ interface Jog {
   name: string;
   startDate: string | null; // ISO date, optional
   endDate: string | null;   // ISO date, optional
+  order: number;
   createdAt: string;
 }
 ```
 
-Start/end dates are set via a small optional date-range picker inside the "+ New Jog" inline creation form; when set, the range is shown next to the jog selector on the board.
+Start/end dates are set via a small optional date-range picker inside the jog create/edit modal; when set, the range is shown next to the jog selector on the board.
 
-Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via an `ensureDefaultJog()` check on the jogs-read path — created lazily the first time the `jogs` collection is empty, no manual seed script. New tickets default to whichever jog is selected in the creation modal (itself defaulting to "Default Jog").
+Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via an `ensureDefaultJog()` check on the jogs-read path — created lazily the first time the `jogs` collection is empty, no manual seed script. It's identified for protection purposes (can't be deleted) by earliest `createdAt`, independent of its display `order`. New tickets default to whichever jog is selected in the creation modal (itself defaulting to "Default Jog").
 
 ## Auth Flow
 
@@ -91,11 +114,14 @@ _TBD — GitHub + Vercel auto-deploy vs Vercel CLI; GCP Firestore project setup 
 - [x] Decide auth flow details
 - [x] Build ticket/jog data layer (`src/lib/types.ts`, `src/lib/firestore.ts`)
 - [x] Build auth (`src/lib/auth.ts`, `src/proxy.ts`, `/login`, auth API routes)
-- [x] Build API routes (`/api/tickets`, `/api/tickets/[id]`, `/api/jogs`)
-- [x] Build `JogsContext`, `AppHeader`, `TicketModal`, `JogSelect`
-- [x] Build Jog board (`/`, `JogBoard`, `JogColumn`, `TicketCard`, drag-and-drop)
-- [x] Build Backlog page (`/backlog`, `BacklogTable`)
-- [x] `npm run build` / `npm run lint` pass; auth flow smoke-tested locally
-- [ ] Set up GCP project + Firestore (blocks actually using the app — board/backlog pages 500 until `GCP_PROJECT_ID`/`GCP_CLIENT_EMAIL`/`GCP_PRIVATE_KEY` are set)
+- [x] Build API routes (tickets, jogs, comments, reorder endpoints)
+- [x] Build `JogsContext`, `AppHeader`, `TicketModal`, `JogSelect`, `JogModal`, `ConfirmModal`
+- [x] Build Jog board (`/`, `JogBoard`, `JogColumn`, `TicketCard`) with cross-column and within-column drag-and-drop
+- [x] Build Backlog page (`/backlog`, `BacklogTable`) with search/filter/sort, drag-reorder, delete
+- [x] Build Jogs page (`/jogs`, `JogsList`) with edit, delete, drag-reorder
+- [x] Add comments on tickets (list in edit modal, hover popover on cards)
+- [x] Full-height layout: header fixed, board columns / lists fill to viewport bottom with internal scroll
+- [x] GCP project (`tim-tickets-505200`) + Firestore (`australia-southeast1`, Native mode) set up, billing linked with a $5/mo budget alert
+- [x] `npm run build` / `npm run lint` pass; smoke-tested locally against real Firestore
 - [ ] Set up Vercel project + env vars
 - [ ] Decide deployment method

@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# GCP service account keys
+.secrets/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

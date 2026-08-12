@@ -191,7 +191,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-x-auto lg:overflow-y-hidden">
-          <div className="grid grid-cols-1 gap-3 lg:h-full lg:min-w-[900px] lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 lg:h-full lg:min-w-[900px] lg:grid-cols-5 lg:grid-rows-1">
             {STATUSES.map((status) => (
               <JogColumn
                 key={status.value}

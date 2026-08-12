@@ -148,7 +148,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative">
           <select
             value={jogFilter}
@@ -168,54 +168,74 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Filter by title or tag…"
-          className="ml-auto w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          className="order-last w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:order-none lg:ml-auto lg:w-64 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-            <tr>
-              <th className="w-8 px-2 py-2" />
-              <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('title')}>
-                Title {sortIndicator('title')}
-              </th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Priority</th>
-              <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('jog')}>
-                Jog {sortIndicator('jog')}
-              </th>
-              <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('createdAt')}>
-                Created {sortIndicator('createdAt')}
-              </th>
-              <th className="w-8 px-2 py-2" />
-            </tr>
-          </thead>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={visibleTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              <tbody>
-                {visibleTickets.map((ticket) => (
-                  <SortableTicketRow
-                    key={ticket.id}
-                    ticket={ticket}
-                    disabled={!canReorder}
-                    statusLabel={statusLabelByValue.get(ticket.status)}
-                    onEdit={() => setEditingTicket(ticket)}
-                    onDelete={() => setDeletingTicket(ticket)}
-                    onReassign={(jogId) => handleReassign(ticket.id, jogId)}
-                  />
-                ))}
-                {visibleTickets.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
-                      No tickets found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </SortableContext>
-          </DndContext>
-        </table>
+      <div className="min-h-0 flex-1 overflow-auto">
+        {/* Desktop: table with drag-reorder */}
+        <div className="hidden rounded-lg border border-gray-200 lg:block dark:border-gray-800">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+              <tr>
+                <th className="w-8 px-2 py-2" />
+                <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('title')}>
+                  Title {sortIndicator('title')}
+                </th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Priority</th>
+                <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('jog')}>
+                  Jog {sortIndicator('jog')}
+                </th>
+                <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('createdAt')}>
+                  Created {sortIndicator('createdAt')}
+                </th>
+                <th className="w-8 px-2 py-2" />
+              </tr>
+            </thead>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={visibleTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                <tbody>
+                  {visibleTickets.map((ticket) => (
+                    <SortableTicketRow
+                      key={ticket.id}
+                      ticket={ticket}
+                      disabled={!canReorder}
+                      statusLabel={statusLabelByValue.get(ticket.status)}
+                      onEdit={() => setEditingTicket(ticket)}
+                      onDelete={() => setDeletingTicket(ticket)}
+                      onReassign={(jogId) => handleReassign(ticket.id, jogId)}
+                    />
+                  ))}
+                  {visibleTickets.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                        No tickets found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </SortableContext>
+            </DndContext>
+          </table>
+        </div>
+
+        {/* Mobile: scrollable list of cards, no drag-reorder */}
+        <div className="space-y-2 lg:hidden">
+          {visibleTickets.map((ticket) => (
+            <BacklogCard
+              key={ticket.id}
+              ticket={ticket}
+              statusLabel={statusLabelByValue.get(ticket.status)}
+              onEdit={() => setEditingTicket(ticket)}
+              onDelete={() => setDeletingTicket(ticket)}
+              onReassign={(jogId) => handleReassign(ticket.id, jogId)}
+            />
+          ))}
+          {visibleTickets.length === 0 && (
+            <p className="px-3 py-6 text-center text-sm text-gray-400 dark:text-gray-500">No tickets found.</p>
+          )}
+        </div>
       </div>
 
       {editingTicket && (
@@ -301,5 +321,51 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
         </button>
       </td>
     </tr>
+  );
+}
+
+interface BacklogCardProps {
+  ticket: Ticket;
+  statusLabel: string | undefined;
+  onEdit: () => void;
+  onDelete: () => void;
+  onReassign: (jogId: string) => void;
+}
+
+function BacklogCard({ ticket, statusLabel, onEdit, onDelete, onReassign }: BacklogCardProps) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-left text-sm font-medium text-gray-900 hover:underline dark:text-gray-100"
+        >
+          {ticket.title}
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="shrink-0 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+          aria-label="Delete ticket"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          {statusLabel}
+        </span>
+        {ticket.priority && (
+          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 capitalize dark:bg-gray-700 dark:text-gray-300">
+            {ticket.priority}
+          </span>
+        )}
+        <span className="text-gray-400 dark:text-gray-500">{new Date(ticket.createdAt).toLocaleDateString()}</span>
+      </div>
+      <div className="mt-2">
+        <JogSelect value={ticket.jogId} onChange={onReassign} className="w-full" />
+      </div>
+    </div>
   );
 }

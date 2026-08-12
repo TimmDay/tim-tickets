@@ -13,13 +13,18 @@ import { TrashIcon } from './TrashIcon';
 import { Jog } from '@/lib/types';
 
 export function JogsList() {
-  const { jogs, deleteJog, reorderJogs, updateJogOrder } = useJogs();
+  const { jogs, deleteJog, reorderJogs, updateJogOrder, completeJog } = useJogs();
   const [editingJog, setEditingJog] = useState<Jog | null>(null);
   const [deletingJog, setDeletingJog] = useState<Jog | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [completingJog, setCompletingJog] = useState<Jog | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [showNewJog, setShowNewJog] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
-  const sortedJogs = useMemo(() => [...jogs].sort((a, b) => a.order - b.order), [jogs]);
+  const displayedJogs = useMemo(
+    () => jogs.filter((jog) => showArchived || !jog.isArchived).sort((a, b) => a.order - b.order),
+    [jogs, showArchived],
+  );
   const defaultJogId = useMemo(
     () => jogs.reduce((earliest, jog) => (jog.createdAt < earliest.createdAt ? jog : earliest), jogs[0])?.id,
     [jogs],
@@ -31,11 +36,11 @@ export function JogsList() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = sortedJogs.findIndex((jog) => jog.id === active.id);
-    const newIndex = sortedJogs.findIndex((jog) => jog.id === over.id);
+    const oldIndex = displayedJogs.findIndex((jog) => jog.id === active.id);
+    const newIndex = displayedJogs.findIndex((jog) => jog.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const moved = arrayMove(sortedJogs, oldIndex, newIndex);
+    const moved = arrayMove(displayedJogs, oldIndex, newIndex);
     const movedIndex = moved.findIndex((jog) => jog.id === active.id);
     const before = moved[movedIndex - 1]?.order ?? null;
     const after = moved[movedIndex + 1]?.order ?? null;
@@ -56,19 +61,30 @@ export function JogsList() {
     try {
       await deleteJog(jog.id);
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Failed to delete jog');
+      setActionError(err instanceof Error ? err.message : 'Failed to delete jog');
+    }
+  }
+
+  async function confirmComplete() {
+    if (!completingJog) return;
+    const jog = completingJog;
+    setCompletingJog(null);
+    try {
+      await completeJog(jog.id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to complete jog');
     }
   }
 
   return (
     <div className="flex h-full flex-col">
-      {deleteError && (
+      {actionError && (
         <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          {deleteError}
+          {actionError}
         </p>
       )}
 
-      <div className="mb-4 flex shrink-0 items-center">
+      <div className="mb-4 flex shrink-0 items-center gap-3">
         <button
           type="button"
           onClick={() => setShowNewJog(true)}
@@ -76,6 +92,15 @@ export function JogsList() {
         >
           New jog
         </button>
+        <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Show archived
+        </label>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
@@ -91,18 +116,19 @@ export function JogsList() {
             </tr>
           </thead>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={sortedJogs.map((jog) => jog.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={displayedJogs.map((jog) => jog.id)} strategy={verticalListSortingStrategy}>
               <tbody>
-                {sortedJogs.map((jog) => (
+                {displayedJogs.map((jog) => (
                   <SortableJogRow
                     key={jog.id}
                     jog={jog}
                     isDefault={jog.id === defaultJogId}
                     onEdit={() => setEditingJog(jog)}
                     onDelete={() => setDeletingJog(jog)}
+                    onComplete={() => setCompletingJog(jog)}
                   />
                 ))}
-                {sortedJogs.length === 0 && (
+                {displayedJogs.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
                       No jogs yet.
@@ -127,6 +153,16 @@ export function JogsList() {
           onCancel={() => setDeletingJog(null)}
         />
       )}
+
+      {completingJog && (
+        <ConfirmModal
+          title="Complete jog"
+          message={`Completing "${completingJog.name}" will archive it, and automatically archive all tasks within it that are in the DONE column. All tasks in other columns will be removed from this jog and put into the backlog (default jog). You can view this archived jog in future by checking the show archived box on the jogs page.`}
+          confirmLabel="Complete"
+          onConfirm={confirmComplete}
+          onCancel={() => setCompletingJog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -136,9 +172,10 @@ interface SortableJogRowProps {
   isDefault: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onComplete: () => void;
 }
 
-function SortableJogRow({ jog, isDefault, onEdit, onDelete }: SortableJogRowProps) {
+function SortableJogRow({ jog, isDefault, onEdit, onDelete, onComplete }: SortableJogRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: jog.id });
 
   return (
@@ -158,17 +195,38 @@ function SortableJogRow({ jog, isDefault, onEdit, onDelete }: SortableJogRowProp
           <GripIcon className="h-4 w-4" />
         </button>
       </td>
-      <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{jog.name}</td>
+      <td
+        className={`px-3 py-2 font-medium ${
+          jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+        }`}
+      >
+        {jog.name}
+      </td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.startDate ?? '—'}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.endDate ?? '—'}</td>
       <td className="px-3 py-2 text-right">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="text-sm text-gray-600 hover:underline dark:text-gray-400"
-        >
-          Edit
-        </button>
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-sm text-gray-600 hover:underline dark:text-gray-400"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={onComplete}
+            disabled={isDefault || jog.isArchived}
+            title={isDefault ? "Can't complete the default jog" : jog.isArchived ? 'Already archived' : undefined}
+            className={`text-sm ${
+              isDefault || jog.isArchived
+                ? 'cursor-not-allowed text-gray-300 dark:text-gray-700'
+                : 'text-gray-600 hover:underline dark:text-gray-400'
+            }`}
+          >
+            Complete
+          </button>
+        </div>
       </td>
       <td className="px-2 py-2 text-right">
         <button

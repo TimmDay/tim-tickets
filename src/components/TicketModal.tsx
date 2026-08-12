@@ -121,6 +121,23 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     }
   }
 
+  async function handleToggleArchive() {
+    if (!ticket) return;
+    setSaving(true);
+    try {
+      const nextArchived = !ticket.isArchived;
+      await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: nextArchived }),
+      });
+      onSaved({ ...ticket, isArchived: nextArchived });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -221,16 +238,26 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex items-center justify-between pt-2">
-            <div>
+            <div className="flex items-center gap-3">
               {isEditing && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={saving}
-                  className="text-sm text-gray-600 hover:underline disabled:opacity-50 dark:text-gray-400"
-                >
-                  Delete ticket
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleToggleArchive}
+                    disabled={saving}
+                    className="text-sm text-gray-600 hover:underline disabled:opacity-50 dark:text-gray-400"
+                  >
+                    {ticket?.isArchived ? 'Unarchive' : 'Archive'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={saving}
+                    className="text-sm text-gray-600 hover:underline disabled:opacity-50 dark:text-gray-400"
+                  >
+                    Delete
+                  </button>
+                </>
               )}
             </div>
             <div className="flex gap-2">

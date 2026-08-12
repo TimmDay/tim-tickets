@@ -7,6 +7,7 @@ const updateJogSchema = z.object({
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   order: z.number().optional(),
+  isArchived: z.boolean().optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

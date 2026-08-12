@@ -15,7 +15,10 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 const POPOVER_WIDTH = 224; // matches w-56
 
 export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ticket.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: ticket.id,
+    disabled: ticket.isArchived,
+  });
   const iconRef = useRef<HTMLSpanElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
@@ -67,7 +70,11 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
         </div>
       )}
 
-      <p className={`font-medium text-gray-900 dark:text-gray-100 ${ticket.comments.length > 0 ? 'pr-5' : ''}`}>
+      <p
+        className={`font-medium ${ticket.comments.length > 0 ? 'pr-5' : ''} ${
+          ticket.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+        }`}
+      >
         {ticket.title}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-1">

@@ -18,6 +18,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [filterText, setFilterText] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const hasRestoredSelection = useRef(false);
 
   if (initialTickets !== prevInitialTickets) {
@@ -67,6 +68,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     const query = filterText.trim().toLowerCase();
     for (const ticket of sorted) {
       if (ticket.jogId !== effectiveJogId) continue;
+      if (ticket.isArchived && !showArchived) continue;
       if (query) {
         const matches =
           ticket.title.toLowerCase().includes(query) || ticket.tags.some((tag) => tag.toLowerCase().includes(query));
@@ -75,7 +77,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       grouped[ticket.status].push(ticket);
     }
     return grouped;
-  }, [tickets, effectiveJogId, filterText]);
+  }, [tickets, effectiveJogId, filterText, showArchived]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -163,18 +165,27 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex shrink-0 items-center gap-3">
-        <JogSelect value={effectiveJogId} onChange={handleSelectJog} className="w-64" />
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
+        <JogSelect value={effectiveJogId} onChange={handleSelectJog} className="w-64" includeArchived={showArchived} />
         {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
           <span className="text-sm text-gray-500 dark:text-gray-400">
             {selectedJog.startDate ?? '…'} → {selectedJog.endDate ?? '…'}
           </span>
         )}
+        <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Show archived
+        </label>
         <input
           value={filterText}
           onChange={(event) => setFilterText(event.target.value)}
           placeholder="Filter by title or tag…"
-          className="ml-auto w-64 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          className="order-last w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:order-none lg:w-64 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>
 

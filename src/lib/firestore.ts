@@ -32,6 +32,7 @@ function toJog(doc: QueryDocumentSnapshot): Jog {
     startDate: data.startDate ?? null,
     endDate: data.endDate ?? null,
     order: data.order ?? new Date(data.createdAt).getTime(),
+    isArchived: data.isArchived ?? false,
     createdAt: data.createdAt,
   };
 }
@@ -49,6 +50,7 @@ function toTicket(doc: QueryDocumentSnapshot): Ticket {
     tags: data.tags ?? [],
     comments: data.comments ?? [],
     order: data.order ?? new Date(data.createdAt).getTime(),
+    isArchived: data.isArchived ?? false,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -60,7 +62,14 @@ export async function ensureDefaultJog(): Promise<Jog> {
     return toJog(snapshot.docs[0]);
   }
   const now = new Date().toISOString();
-  const data = { name: DEFAULT_JOG_NAME, startDate: null, endDate: null, order: Date.now(), createdAt: now };
+  const data = {
+    name: DEFAULT_JOG_NAME,
+    startDate: null,
+    endDate: null,
+    order: Date.now(),
+    isArchived: false,
+    createdAt: now,
+  };
   const ref = await jogsCollection().add(data);
   return { id: ref.id, ...data };
 }
@@ -77,7 +86,7 @@ export async function createJog(
   endDate: string | null = null,
 ): Promise<Jog> {
   const now = new Date().toISOString();
-  const data = { name, startDate, endDate, order: Date.now(), createdAt: now };
+  const data = { name, startDate, endDate, order: Date.now(), isArchived: false, createdAt: now };
   const ref = await jogsCollection().add(data);
   return { id: ref.id, ...data };
 }
@@ -97,6 +106,7 @@ export interface UpdateJogInput {
   startDate?: string | null;
   endDate?: string | null;
   order?: number;
+  isArchived?: boolean;
 }
 
 export async function updateJog(id: string, input: UpdateJogInput): Promise<void> {
@@ -116,6 +126,31 @@ export async function deleteJog(id: string): Promise<void> {
     batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now });
   });
   batch.delete(jogsCollection().doc(id));
+  await batch.commit();
+}
+
+/** Archives a jog: tickets currently in the "done" column are archived along with it,
+ * everything else is moved out to the default jog so it isn't stranded on a hidden jog. */
+export async function completeJog(id: string): Promise<void> {
+  const defaultJog = await ensureDefaultJog();
+  if (id === defaultJog.id) {
+    throw new Error('Cannot complete the default jog');
+  }
+
+  const jogTickets = await ticketsCollection().where('jogId', '==', id).get();
+  const batch = getFirestore().batch();
+  const now = new Date().toISOString();
+
+  batch.update(jogsCollection().doc(id), { isArchived: true });
+
+  jogTickets.docs.forEach((doc) => {
+    if (doc.data().status === 'done') {
+      batch.update(doc.ref, { isArchived: true, updatedAt: now });
+    } else {
+      batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now });
+    }
+  });
+
   await batch.commit();
 }
 
@@ -145,6 +180,7 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
     tags: input.tags,
     comments: [] as Comment[],
     order: Date.now(),
+    isArchived: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -172,6 +208,7 @@ export interface UpdateTicketInput {
   dueDate?: string | null;
   tags?: string[];
   order?: number;
+  isArchived?: boolean;
 }
 
 export async function updateTicket(id: string, input: UpdateTicketInput): Promise<void> {

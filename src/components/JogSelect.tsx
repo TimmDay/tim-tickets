@@ -8,9 +8,10 @@ interface JogSelectProps {
   value: string;
   onChange: (jogId: string) => void;
   className?: string;
+  includeArchived?: boolean;
 }
 
-export function JogSelect({ value, onChange, className }: JogSelectProps) {
+export function JogSelect({ value, onChange, className, includeArchived = false }: JogSelectProps) {
   const { jogs, createJog } = useJogs();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -18,7 +19,11 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
   const [newStartDate, setNewStartDate] = useState('');
   const [newEndDate, setNewEndDate] = useState('');
 
+  // The trigger looks up against the full list so it can still show the name of the
+  // current value even if that jog happens to be archived; only the dropdown's option
+  // list is filtered, so archived jogs generally aren't selectable as new targets.
   const selected = jogs.find((jog) => jog.id === value);
+  const selectableJogs = jogs.filter((jog) => includeArchived || !jog.isArchived);
 
   function closeAndReset() {
     setOpen(false);
@@ -56,7 +61,7 @@ export function JogSelect({ value, onChange, className }: JogSelectProps) {
           <div className="fixed inset-0 z-10" onClick={closeAndReset} />
           <div className="absolute z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
             <ul className="max-h-48 overflow-auto">
-              {jogs.map((jog) => (
+              {selectableJogs.map((jog) => (
                 <li key={jog.id}>
                   <button
                     type="button"

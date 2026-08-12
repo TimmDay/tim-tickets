@@ -6,6 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { ArchiveIcon } from './ArchiveIcon';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { GripIcon } from './GripIcon';
@@ -33,13 +34,18 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const jogNameById = useMemo(() => new Map(jogs.map((jog) => [jog.id, jog.name])), [jogs]);
   const statusLabelByValue = useMemo(() => new Map(STATUSES.map((s) => [s.value, s.label])), []);
+  const visibleJogs = useMemo(() => jogs.filter((jog) => showArchived || !jog.isArchived), [jogs, showArchived]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const canReorder = sortKey === 'manual' && !search.trim() && jogFilter === 'all';
+  // Reordering assumes visibleTickets is exactly the full underlying list (just re-sorted),
+  // so it can safely be disabled whenever any filter — including "hide archived", which is
+  // the default — narrows what's shown.
+  const canReorder = sortKey === 'manual' && !search.trim() && jogFilter === 'all' && !showArchived;
 
   function toggleSort(key: Exclude<SortKey, 'manual'>) {
     if (sortKey === key) {
@@ -52,6 +58,10 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   const visibleTickets = useMemo(() => {
     let result = tickets;
+
+    if (!showArchived) {
+      result = result.filter((ticket) => !ticket.isArchived);
+    }
 
     if (search.trim()) {
       const query = search.trim().toLowerCase();
@@ -78,7 +88,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
     });
 
     return result;
-  }, [tickets, search, jogFilter, sortKey, sortDirection, jogNameById]);
+  }, [tickets, search, jogFilter, sortKey, sortDirection, jogNameById, showArchived]);
 
   async function handleReassign(ticketId: string, jogId: string) {
     setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, jogId } : t)));
@@ -97,6 +107,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   function handleDeleted(ticketId: string) {
     setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+  }
+
+  async function handleToggleArchive(ticketId: string, nextArchived: boolean) {
+    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, isArchived: nextArchived } : t)));
+    await fetch(`/api/tickets/${ticketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isArchived: nextArchived }),
+    });
   }
 
   async function confirmDeleteTicket() {
@@ -156,7 +175,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
             className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
             <option value="all">All jogs</option>
-            {jogs.map((jog) => (
+            {visibleJogs.map((jog) => (
               <option key={jog.id} value={jog.id}>
                 {jog.name}
               </option>
@@ -164,11 +183,20 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           </select>
           <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         </div>
+        <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Show archived
+        </label>
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Filter by title or tag…"
-          className="order-last w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:order-none lg:ml-auto lg:w-64 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          className="order-last w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:order-none lg:w-64 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>
 
@@ -205,6 +233,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
                       onEdit={() => setEditingTicket(ticket)}
                       onDelete={() => setDeletingTicket(ticket)}
                       onReassign={(jogId) => handleReassign(ticket.id, jogId)}
+                      onToggleArchive={() => handleToggleArchive(ticket.id, !ticket.isArchived)}
                     />
                   ))}
                   {visibleTickets.length === 0 && (
@@ -230,6 +259,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
               onEdit={() => setEditingTicket(ticket)}
               onDelete={() => setDeletingTicket(ticket)}
               onReassign={(jogId) => handleReassign(ticket.id, jogId)}
+              onToggleArchive={() => handleToggleArchive(ticket.id, !ticket.isArchived)}
             />
           ))}
           {visibleTickets.length === 0 && (
@@ -266,9 +296,18 @@ interface SortableTicketRowProps {
   onEdit: () => void;
   onDelete: () => void;
   onReassign: (jogId: string) => void;
+  onToggleArchive: () => void;
 }
 
-function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, onReassign }: SortableTicketRowProps) {
+function SortableTicketRow({
+  ticket,
+  disabled,
+  statusLabel,
+  onEdit,
+  onDelete,
+  onReassign,
+  onToggleArchive,
+}: SortableTicketRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
     disabled,
@@ -299,7 +338,9 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
         <button
           type="button"
           onClick={onEdit}
-          className="text-left font-medium text-gray-900 hover:underline dark:text-gray-100"
+          className={`text-left font-medium hover:underline ${
+            ticket.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+          }`}
         >
           {ticket.title}
         </button>
@@ -311,14 +352,29 @@ function SortableTicketRow({ ticket, disabled, statusLabel, onEdit, onDelete, on
       </td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{new Date(ticket.createdAt).toLocaleDateString()}</td>
       <td className="px-2 py-2 text-right">
-        <button
-          type="button"
-          onClick={onDelete}
-          className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
-          aria-label="Delete ticket"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onToggleArchive}
+            className={
+              ticket.isArchived
+                ? 'text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300'
+                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+            }
+            aria-label={ticket.isArchived ? 'Unarchive ticket' : 'Archive ticket'}
+            title={ticket.isArchived ? 'Unarchive ticket' : 'Archive ticket'}
+          >
+            <ArchiveIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+            aria-label="Delete ticket"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -330,27 +386,45 @@ interface BacklogCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onReassign: (jogId: string) => void;
+  onToggleArchive: () => void;
 }
 
-function BacklogCard({ ticket, statusLabel, onEdit, onDelete, onReassign }: BacklogCardProps) {
+function BacklogCard({ ticket, statusLabel, onEdit, onDelete, onReassign, onToggleArchive }: BacklogCardProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
           onClick={onEdit}
-          className="text-left text-sm font-medium text-gray-900 hover:underline dark:text-gray-100"
+          className={`text-left text-sm font-medium hover:underline ${
+            ticket.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+          }`}
         >
           {ticket.title}
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="shrink-0 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
-          aria-label="Delete ticket"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleArchive}
+            className={
+              ticket.isArchived
+                ? 'text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300'
+                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+            }
+            aria-label={ticket.isArchived ? 'Unarchive ticket' : 'Archive ticket'}
+            title={ticket.isArchived ? 'Unarchive ticket' : 'Archive ticket'}
+          >
+            <ArchiveIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+            aria-label="Delete ticket"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">

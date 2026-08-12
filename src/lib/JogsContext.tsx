@@ -11,6 +11,7 @@ interface JogsContextValue {
   updateJogOrder: (id: string, order: number) => Promise<void>;
   deleteJog: (id: string) => Promise<void>;
   reorderJogs: (orderedIds: string[]) => Promise<void>;
+  completeJog: (id: string) => Promise<void>;
 }
 
 const JogsContext = createContext<JogsContextValue | null>(null);
@@ -89,8 +90,19 @@ export function JogsProvider({
     });
   }, []);
 
+  const completeJog = useCallback(async (id: string) => {
+    const response = await fetch(`/api/jogs/${id}/complete`, { method: 'POST' });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? 'Failed to complete jog');
+    }
+    setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, isArchived: true } : jog)));
+  }, []);
+
   return (
-    <JogsContext.Provider value={{ jogs, refresh, createJog, updateJog, updateJogOrder, deleteJog, reorderJogs }}>
+    <JogsContext.Provider
+      value={{ jogs, refresh, createJog, updateJog, updateJogOrder, deleteJog, reorderJogs, completeJog }}
+    >
       {children}
     </JogsContext.Provider>
   );

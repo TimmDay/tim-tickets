@@ -19,6 +19,7 @@ export interface Ticket {
   tags: string[];
   comments: Comment[];
   order: number;
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +30,7 @@ export interface Jog {
   startDate: string | null;
   endDate: string | null;
   order: number;
+  isArchived: boolean;
   createdAt: string;
 }
 

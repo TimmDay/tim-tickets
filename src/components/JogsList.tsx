@@ -12,7 +12,11 @@ import { JogModal } from './JogModal';
 import { TrashIcon } from './TrashIcon';
 import { Jog } from '@/lib/types';
 
-export function JogsList() {
+interface JogsListProps {
+  ticketCounts: Record<string, number>;
+}
+
+export function JogsList({ ticketCounts }: JogsListProps) {
   const { jogs, deleteJog, reorderJogs, updateJogOrder, completeJog } = useJogs();
   const [editingJog, setEditingJog] = useState<Jog | null>(null);
   const [deletingJog, setDeletingJog] = useState<Jog | null>(null);
@@ -103,42 +107,65 @@ export function JogsList() {
         </label>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-              <tr>
-                <th className="w-8 px-2 py-2" />
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Start date</th>
-                <th className="px-3 py-2 font-medium">End date</th>
-                <th className="px-3 py-2 font-medium" />
-                <th className="w-8 px-2 py-2" />
-              </tr>
-            </thead>
-            <SortableContext items={displayedJogs.map((jog) => jog.id)} strategy={verticalListSortingStrategy}>
-              <tbody>
-                {displayedJogs.map((jog) => (
-                  <SortableJogRow
-                    key={jog.id}
-                    jog={jog}
-                    isDefault={jog.id === defaultJogId}
-                    onEdit={() => setEditingJog(jog)}
-                    onDelete={() => setDeletingJog(jog)}
-                    onComplete={() => setCompletingJog(jog)}
-                  />
-                ))}
-                {displayedJogs.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
-                      No jogs yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </SortableContext>
-          </table>
-        </DndContext>
+      <div className="min-h-0 flex-1 overflow-auto">
+        {/* Desktop: table with drag-reorder */}
+        <div className="hidden rounded-lg border border-gray-200 lg:block dark:border-gray-800">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+                <tr>
+                  <th className="w-8 px-2 py-2" />
+                  <th className="px-3 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium">Start date</th>
+                  <th className="px-3 py-2 font-medium">End date</th>
+                  <th className="px-3 py-2 font-medium">Tickets</th>
+                  <th className="px-3 py-2 font-medium" />
+                  <th className="w-8 px-2 py-2" />
+                </tr>
+              </thead>
+              <SortableContext items={displayedJogs.map((jog) => jog.id)} strategy={verticalListSortingStrategy}>
+                <tbody>
+                  {displayedJogs.map((jog) => (
+                    <SortableJogRow
+                      key={jog.id}
+                      jog={jog}
+                      isDefault={jog.id === defaultJogId}
+                      ticketCount={ticketCounts[jog.id] ?? 0}
+                      onEdit={() => setEditingJog(jog)}
+                      onDelete={() => setDeletingJog(jog)}
+                      onComplete={() => setCompletingJog(jog)}
+                    />
+                  ))}
+                  {displayedJogs.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                        No jogs yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </SortableContext>
+            </table>
+          </DndContext>
+        </div>
+
+        {/* Mobile: scrollable list of cards, no drag-reorder */}
+        <div className="space-y-2 lg:hidden">
+          {displayedJogs.map((jog) => (
+            <JogCard
+              key={jog.id}
+              jog={jog}
+              isDefault={jog.id === defaultJogId}
+              ticketCount={ticketCounts[jog.id] ?? 0}
+              onEdit={() => setEditingJog(jog)}
+              onDelete={() => setDeletingJog(jog)}
+              onComplete={() => setCompletingJog(jog)}
+            />
+          ))}
+          {displayedJogs.length === 0 && (
+            <p className="px-3 py-6 text-center text-sm text-gray-400 dark:text-gray-500">No jogs yet.</p>
+          )}
+        </div>
       </div>
 
       {editingJog && <JogModal jog={editingJog} onClose={() => setEditingJog(null)} onSaved={() => {}} />}
@@ -170,12 +197,13 @@ export function JogsList() {
 interface SortableJogRowProps {
   jog: Jog;
   isDefault: boolean;
+  ticketCount: number;
   onEdit: () => void;
   onDelete: () => void;
   onComplete: () => void;
 }
 
-function SortableJogRow({ jog, isDefault, onEdit, onDelete, onComplete }: SortableJogRowProps) {
+function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete }: SortableJogRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: jog.id });
 
   return (
@@ -204,6 +232,7 @@ function SortableJogRow({ jog, isDefault, onEdit, onDelete, onComplete }: Sortab
       </td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.startDate ?? '—'}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.endDate ?? '—'}</td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{ticketCount}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-3">
           <button
@@ -243,5 +272,69 @@ function SortableJogRow({ jog, isDefault, onEdit, onDelete, onComplete }: Sortab
         </button>
       </td>
     </tr>
+  );
+}
+
+interface JogCardProps {
+  jog: Jog;
+  isDefault: boolean;
+  ticketCount: number;
+  onEdit: () => void;
+  onDelete: () => void;
+  onComplete: () => void;
+}
+
+function JogCard({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete }: JogCardProps) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={onEdit}
+          className={`text-left text-sm font-medium hover:underline ${
+            jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+          }`}
+        >
+          {jog.name}
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={isDefault}
+          title={isDefault ? "Can't delete the default jog" : undefined}
+          className={`shrink-0 text-gray-400 dark:text-gray-500 ${
+            isDefault ? 'cursor-not-allowed opacity-30' : 'hover:text-red-600 dark:hover:text-red-400'
+          }`}
+          aria-label="Delete jog"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-500">
+        {(jog.startDate || jog.endDate) && (
+          <span>
+            {jog.startDate ?? '…'} → {jog.endDate ?? '…'}
+          </span>
+        )}
+        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          {ticketCount} ticket{ticketCount === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={onComplete}
+          disabled={isDefault || jog.isArchived}
+          title={isDefault ? "Can't complete the default jog" : jog.isArchived ? 'Already archived' : undefined}
+          className={`text-sm ${
+            isDefault || jog.isArchived
+              ? 'cursor-not-allowed text-gray-300 dark:text-gray-700'
+              : 'text-gray-600 hover:underline dark:text-gray-400'
+          }`}
+        >
+          Complete
+        </button>
+      </div>
+    </div>
   );
 }

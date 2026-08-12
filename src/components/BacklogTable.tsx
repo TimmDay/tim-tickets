@@ -203,25 +203,25 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
       <div className="min-h-0 flex-1 overflow-auto">
         {/* Desktop: table with drag-reorder */}
         <div className="hidden rounded-lg border border-gray-200 lg:block dark:border-gray-800">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-              <tr>
-                <th className="w-8 px-2 py-2" />
-                <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('title')}>
-                  Title {sortIndicator('title')}
-                </th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Priority</th>
-                <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('jog')}>
-                  Jog {sortIndicator('jog')}
-                </th>
-                <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('createdAt')}>
-                  Created {sortIndicator('createdAt')}
-                </th>
-                <th className="w-8 px-2 py-2" />
-              </tr>
-            </thead>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+                <tr>
+                  <th className="w-8 px-2 py-2" />
+                  <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('title')}>
+                    Title {sortIndicator('title')}
+                  </th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Priority</th>
+                  <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('jog')}>
+                    Jog {sortIndicator('jog')}
+                  </th>
+                  <th className="cursor-pointer px-3 py-2 font-medium" onClick={() => toggleSort('createdAt')}>
+                    Created {sortIndicator('createdAt')}
+                  </th>
+                  <th className="w-8 px-2 py-2" />
+                </tr>
+              </thead>
               <SortableContext items={visibleTickets.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <tbody>
                   {visibleTickets.map((ticket) => (
@@ -245,8 +245,8 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
                   )}
                 </tbody>
               </SortableContext>
-            </DndContext>
-          </table>
+            </table>
+          </DndContext>
         </div>
 
         {/* Mobile: scrollable list of cards, no drag-reorder */}

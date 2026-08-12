@@ -104,18 +104,18 @@ export function JogsList() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-            <tr>
-              <th className="w-8 px-2 py-2" />
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Start date</th>
-              <th className="px-3 py-2 font-medium">End date</th>
-              <th className="px-3 py-2 font-medium" />
-              <th className="w-8 px-2 py-2" />
-            </tr>
-          </thead>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+              <tr>
+                <th className="w-8 px-2 py-2" />
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Start date</th>
+                <th className="px-3 py-2 font-medium">End date</th>
+                <th className="px-3 py-2 font-medium" />
+                <th className="w-8 px-2 py-2" />
+              </tr>
+            </thead>
             <SortableContext items={displayedJogs.map((jog) => jog.id)} strategy={verticalListSortingStrategy}>
               <tbody>
                 {displayedJogs.map((jog) => (
@@ -137,8 +137,8 @@ export function JogsList() {
                 )}
               </tbody>
             </SortableContext>
-          </DndContext>
-        </table>
+          </table>
+        </DndContext>
       </div>
 
       {editingJog && <JogModal jog={editingJog} onClose={() => setEditingJog(null)} onSaved={() => {}} />}

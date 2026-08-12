@@ -48,6 +48,8 @@ export const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 'high', label: 'High' },
 ];
 
-export const DEFAULT_JOG_NAME = 'Default Jog';
+export const BASE_TAGS = ['Life-admin', 'Travel', 'Learn', 'Fun', 'Career', 'Social', 'Dev'];
+
+export const DEFAULT_JOG_NAME = 'backlog';
 
 export const ORDER_GAP = 1000;

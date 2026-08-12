@@ -4,9 +4,10 @@ import { SubmitEvent, useState } from 'react';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { JogSelect } from './JogSelect';
+import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
-import { Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
+import { BASE_TAGS, Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 interface TicketModalProps {
   ticket?: Ticket | null;
@@ -26,7 +27,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? null);
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
   const [dueDate, setDueDate] = useState(ticket?.dueDate ?? '');
-  const [tagsText, setTagsText] = useState((ticket?.tags ?? []).join(', '));
+  const [tags, setTags] = useState<string[]>(ticket?.tags ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,11 +41,6 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     if (!title.trim() || !jogId) return;
     setSaving(true);
     setError(null);
-
-    const tags = tagsText
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean);
 
     const payload = {
       title: title.trim(),
@@ -214,25 +210,30 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
-              <input
-                type="date"
-                value={dueDate ?? ''}
-                onChange={(event) => setDueDate(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
+            <input
+              type="date"
+              value={dueDate ?? ''}
+              onChange={(event) => setDueDate(event.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
+              {tags.map((tag) => (
+                <TagChip key={tag} tag={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))} />
+              ))}
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
-              <input
-                value={tagsText}
-                onChange={(event) => setTagsText(event.target.value)}
-                placeholder="comma, separated"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              />
-            </div>
+            <TagInput
+              value={tags}
+              onChange={setTags}
+              options={BASE_TAGS}
+              placeholder="Type to search or add a tag…"
+              showChips={false}
+            />
           </div>
 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

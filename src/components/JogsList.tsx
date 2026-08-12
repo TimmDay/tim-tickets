@@ -97,7 +97,7 @@ export function JogsList() {
             type="checkbox"
             checked={showArchived}
             onChange={(event) => setShowArchived(event.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-600"
+            className="tt-checkbox"
           />
           Show archived
         </label>

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Epic } from './types';
 
 interface EpicsContextValue {
@@ -14,26 +14,24 @@ interface EpicsContextValue {
 
 const EpicsContext = createContext<EpicsContextValue | null>(null);
 
-export function EpicsProvider({
-  children,
-  initialEpics,
-}: {
-  children: ReactNode;
-  initialEpics: Epic[];
-}) {
-  const [epics, setEpics] = useState<Epic[]>(initialEpics);
-  const [prevInitialEpics, setPrevInitialEpics] = useState(initialEpics);
-
-  if (initialEpics !== prevInitialEpics) {
-    setPrevInitialEpics(initialEpics);
-    setEpics(initialEpics);
-  }
+export function EpicsProvider({ children }: { children: ReactNode }) {
+  const [epics, setEpics] = useState<Epic[]>([]);
+  const hasFetched = useRef(false);
 
   const refresh = useCallback(async () => {
     const response = await fetch('/api/epics');
     const data: Epic[] = await response.json();
     setEpics(data);
   }, []);
+
+  // Fetched once client-side on first mount, rather than server-rendered per navigation —
+  // this provider lives at the layout level and isn't remounted by client-side navigation
+  // between sibling routes, so a single fetch here covers the whole session.
+  useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    refresh();
+  }, [refresh]);
 
   const createEpic = useCallback(async (name: string) => {
     const response = await fetch('/api/epics', {

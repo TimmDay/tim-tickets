@@ -1,6 +1,8 @@
 import { getTickets } from '@/lib/firestore';
 import { EpicsList } from '@/components/EpicsList';
 
+export const dynamic = 'force-dynamic';
+
 export default async function EpicsPage() {
   const tickets = await getTickets();
   const ticketCounts: Record<string, number> = {};

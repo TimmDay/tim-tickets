@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Jog, ORDER_GAP } from './types';
 
 interface JogsContextValue {
@@ -16,26 +16,24 @@ interface JogsContextValue {
 
 const JogsContext = createContext<JogsContextValue | null>(null);
 
-export function JogsProvider({
-  children,
-  initialJogs,
-}: {
-  children: ReactNode;
-  initialJogs: Jog[];
-}) {
-  const [jogs, setJogs] = useState<Jog[]>(initialJogs);
-  const [prevInitialJogs, setPrevInitialJogs] = useState(initialJogs);
-
-  if (initialJogs !== prevInitialJogs) {
-    setPrevInitialJogs(initialJogs);
-    setJogs(initialJogs);
-  }
+export function JogsProvider({ children }: { children: ReactNode }) {
+  const [jogs, setJogs] = useState<Jog[]>([]);
+  const hasFetched = useRef(false);
 
   const refresh = useCallback(async () => {
     const response = await fetch('/api/jogs');
     const data: Jog[] = await response.json();
     setJogs(data);
   }, []);
+
+  // Fetched once client-side on first mount, rather than server-rendered per navigation —
+  // this provider lives at the layout level and isn't remounted by client-side navigation
+  // between sibling routes, so a single fetch here covers the whole session.
+  useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    refresh();
+  }, [refresh]);
 
   const createJog = useCallback(async (name: string, startDate?: string | null, endDate?: string | null) => {
     const response = await fetch('/api/jogs', {

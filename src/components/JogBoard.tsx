@@ -39,8 +39,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   // takes priority over whatever was last persisted to localStorage; either way this must
   // happen post-mount (not during the initial render) since localStorage isn't available
   // during server rendering and reading it there would cause a hydration mismatch.
+  // `jogs` is now fetched client-side (see JogsContext) so it's genuinely empty for the
+  // first render or two — wait for it to actually populate (always non-empty once loaded,
+  // per `ensureDefaultJog`) before validating a jogId against it and locking this to run-once,
+  // otherwise a real jogId/localStorage entry would always fail validation against `[]`.
   useEffect(() => {
     if (hasRestoredSelection.current) return;
+    if (jogs.length === 0) return;
     hasRestoredSelection.current = true;
 
     const jogIdParam = searchParams.get('jogId');

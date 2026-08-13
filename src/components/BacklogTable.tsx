@@ -9,6 +9,7 @@ import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
+import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
 import { JogSelect } from './JogSelect';
 import { TicketModal } from './TicketModal';
@@ -192,12 +193,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           />
           Show archived
         </label>
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Filter by title or tag…"
-          className="order-last w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:order-none lg:w-64 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
+        <FilterInput value={search} onChange={setSearch} placeholder="Filter by title or tag…" />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">

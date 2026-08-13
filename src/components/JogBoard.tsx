@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
 import { TicketModal } from './TicketModal';
@@ -181,12 +182,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           />
           Show archived
         </label>
-        <input
-          value={filterText}
-          onChange={(event) => setFilterText(event.target.value)}
-          placeholder="Filter by title or tag…"
-          className="order-last w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:order-none lg:w-64 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
+        <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter by title or tag…" />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

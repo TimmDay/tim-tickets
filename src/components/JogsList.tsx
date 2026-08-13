@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ConfirmModal } from './ConfirmModal';
+import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
 import { JogModal } from './JogModal';
 import { TrashIcon } from './TrashIcon';
@@ -24,11 +25,15 @@ export function JogsList({ ticketCounts }: JogsListProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showNewJog, setShowNewJog] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [filterText, setFilterText] = useState('');
 
-  const displayedJogs = useMemo(
-    () => jogs.filter((jog) => showArchived || !jog.isArchived).sort((a, b) => a.order - b.order),
-    [jogs, showArchived],
-  );
+  const displayedJogs = useMemo(() => {
+    const query = filterText.trim().toLowerCase();
+    return jogs
+      .filter((jog) => showArchived || !jog.isArchived)
+      .filter((jog) => !query || jog.name.toLowerCase().includes(query))
+      .sort((a, b) => a.order - b.order);
+  }, [jogs, showArchived, filterText]);
   const defaultJogId = useMemo(
     () => jogs.reduce((earliest, jog) => (jog.createdAt < earliest.createdAt ? jog : earliest), jogs[0])?.id,
     [jogs],
@@ -88,7 +93,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
         </p>
       )}
 
-      <div className="mb-4 flex shrink-0 items-center gap-3">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => setShowNewJog(true)}
@@ -105,6 +110,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
           />
           Show archived
         </label>
+        <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter Jogs by title…" />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">

@@ -1,5 +1,5 @@
 import { FieldValue, Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
-import { Comment, DEFAULT_JOG_NAME, Jog, ORDER_GAP, Priority, Ticket, TicketStatus } from './types';
+import { Comment, DEFAULT_JOG_NAME, Epic, Jog, ORDER_GAP, Priority, Ticket, TicketStatus } from './types';
 
 let firestore: Firestore | null = null;
 
@@ -23,6 +23,7 @@ function getFirestore(): Firestore {
 
 const ticketsCollection = () => getFirestore().collection('tickets');
 const jogsCollection = () => getFirestore().collection('jogs');
+const epicsCollection = () => getFirestore().collection('epics');
 
 function toJog(doc: QueryDocumentSnapshot): Jog {
   const data = doc.data();
@@ -37,6 +38,16 @@ function toJog(doc: QueryDocumentSnapshot): Jog {
   };
 }
 
+function toEpic(doc: QueryDocumentSnapshot): Epic {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    name: data.name,
+    isArchived: data.isArchived ?? false,
+    createdAt: data.createdAt,
+  };
+}
+
 function toTicket(doc: QueryDocumentSnapshot): Ticket {
   const data = doc.data();
   return {
@@ -46,6 +57,7 @@ function toTicket(doc: QueryDocumentSnapshot): Ticket {
     acceptanceCriteria: data.acceptanceCriteria ?? '',
     status: data.status,
     jogId: data.jogId,
+    epicId: data.epicId ?? null,
     priority: data.priority ?? null,
     dueDate: data.dueDate ?? null,
     tags: data.tags ?? [],
@@ -155,6 +167,48 @@ export async function completeJog(id: string): Promise<void> {
   await batch.commit();
 }
 
+export async function getEpics(): Promise<Epic[]> {
+  const snapshot = await epicsCollection().orderBy('createdAt', 'asc').get();
+  return snapshot.docs.map(toEpic);
+}
+
+export async function createEpic(name: string): Promise<Epic> {
+  const now = new Date().toISOString();
+  const data = { name, isArchived: false, createdAt: now };
+  const ref = await epicsCollection().add(data);
+  return { id: ref.id, ...data };
+}
+
+export async function updateEpic(id: string, name: string): Promise<void> {
+  await epicsCollection().doc(id).update({ name });
+}
+
+export async function deleteEpic(id: string): Promise<void> {
+  const memberTickets = await ticketsCollection().where('epicId', '==', id).get();
+  const batch = getFirestore().batch();
+  const now = new Date().toISOString();
+  memberTickets.docs.forEach((doc) => {
+    batch.update(doc.ref, { epicId: null, updatedAt: now });
+  });
+  batch.delete(epicsCollection().doc(id));
+  await batch.commit();
+}
+
+/** Archives an epic and every ticket assigned to it, regardless of status. */
+export async function archiveEpic(id: string): Promise<void> {
+  const memberTickets = await ticketsCollection().where('epicId', '==', id).get();
+  const batch = getFirestore().batch();
+  const now = new Date().toISOString();
+
+  batch.update(epicsCollection().doc(id), { isArchived: true });
+
+  memberTickets.docs.forEach((doc) => {
+    batch.update(doc.ref, { isArchived: true, updatedAt: now });
+  });
+
+  await batch.commit();
+}
+
 export async function getTickets(): Promise<Ticket[]> {
   const snapshot = await ticketsCollection().orderBy('createdAt', 'asc').get();
   return snapshot.docs.map(toTicket);
@@ -165,6 +219,7 @@ export interface CreateTicketInput {
   body: string;
   acceptanceCriteria: string;
   jogId: string;
+  epicId: string | null;
   priority: Priority | null;
   dueDate: string | null;
   tags: string[];
@@ -178,6 +233,7 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
     acceptanceCriteria: input.acceptanceCriteria,
     status: 'todo' as TicketStatus,
     jogId: input.jogId,
+    epicId: input.epicId,
     priority: input.priority,
     dueDate: input.dueDate,
     tags: input.tags,
@@ -208,6 +264,7 @@ export interface UpdateTicketInput {
   acceptanceCriteria?: string;
   status?: TicketStatus;
   jogId?: string;
+  epicId?: string | null;
   priority?: Priority | null;
   dueDate?: string | null;
   tags?: string[];

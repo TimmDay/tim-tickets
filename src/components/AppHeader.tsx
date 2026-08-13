@@ -10,6 +10,7 @@ const TABS = [
   { href: '/', label: 'Current Jog' },
   { href: '/backlog', label: 'Backlog' },
   { href: '/jogs', label: 'Jogs' },
+  { href: '/epics', label: 'Epics' },
 ];
 
 export function AppHeader() {

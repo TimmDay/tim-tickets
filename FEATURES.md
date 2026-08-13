@@ -6,13 +6,15 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 
 - Personal, single-user issue tracker inspired by Jira/Trello.
 - Terminology: a **"jog"** is functionally a sprint.
-- Three pages, all behind the password gate: **Current Jog** (kanban, scoped to one jog), **Backlog** (flat list of every ticket, Jira-style), **Jogs** (manage jogs).
+- Four pages, all behind the password gate: **Current Jog** (kanban, scoped to one jog), **Backlog** (flat list of every ticket, Jira-style), **Jogs** (manage jogs), **Epics** (manage epics).
+- An **epic** is an optional grouping of tickets by topic/feature/project (a ticket belongs to at most one epic). Epics are independent of jogs — a jog is "when", an epic is "what project".
 - Deployed on Vercel, data stored in GCP Firestore, single shared-password gate for access.
 
 ## Pages
 
 ### `/` — Current Jog board
 - Dropdown at the top selects which jog to view (defaults to "Default Jog" or the first jog).
+- A second dropdown filters the board by epic (All epics / No epic / a specific epic).
 - Five fixed columns: `todo`, `in_progress`, `blocked`, `in_review`, `done`, populated with tickets whose `jogId` matches the selected jog.
 - Cards are draggable both across columns (updates `status`) and within a column (reorders `order`), via `@dnd-kit/sortable`'s multi-container pattern.
 - Clicking a card opens it in the edit modal (includes Delete, and a Comments section — see below).
@@ -20,7 +22,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 
 ### `/backlog` — Backlog list
 - Flat table of **all** tickets across all jogs.
-- Client-side text search (title substring match), filter by jog, sort by title / jog / created date (click column header to toggle asc/desc), or drag rows via a grip handle to set a manual order (only active when no search/filter is applied and no column sort is active — dragging while a column sort or filter is active would be ambiguous, so the handle is shown but disabled with an explanatory tooltip in that state).
+- Client-side text search (title substring match), filter by jog, filter by epic (All epics / No epic / a specific epic), sort by title / jog / created date (click column header to toggle asc/desc), or drag rows via a grip handle to set a manual order (only active when no search/filter is applied and no column sort is active — dragging while a column sort or filter is active would be ambiguous, so the handle is shown but disabled with an explanatory tooltip in that state).
 - Each row has a jog-reassignment dropdown; selecting "+ New Jog" at the bottom reveals an inline name input to create a jog on the spot (no native browser `prompt()`), plus a "New jog" button next to the filter dropdown that opens the same create/edit modal.
 - Each row has a delete icon (trash, right end) opening a confirmation modal before deleting.
 - Table fills the full remaining viewport height with internal scroll.
@@ -32,10 +34,18 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Delete icon per row opens a confirmation modal. The structurally-special "default jog" (earliest-created, guaranteed to always exist) cannot be deleted — its delete icon is disabled. Deleting any other jog reassigns its member tickets to the default jog rather than orphaning them.
 - Table fills the full remaining viewport height with internal scroll.
 
+### `/epics` — Epics list
+- Table of every epic: name, ticket count.
+- Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing only changes the epic's name.
+- Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
+- Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
+- No manual reorder — epics aren't sequenced like jogs, so the list has no drag handle.
+- Table fills the full remaining viewport height with internal scroll.
+
 ### Global "+ Add" button
-- Lives in the header, visible on all three pages.
+- Lives in the header, visible on all pages.
 - Opens a ticket-creation modal, reused for editing existing tickets.
-- Fields: title, body, acceptance criteria (optional, one testable line per bullet), jog (select, includes "+ New Jog"), priority, due date, tags (freeform comma-separated).
+- Fields: title, body, acceptance criteria (optional, one testable line per bullet), jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date.
 - Clicking outside the modal (the backdrop) closes it, same as Cancel.
 
 ### Comments
@@ -63,6 +73,7 @@ interface Ticket {
   acceptanceCriteria: string; // optional; one testable bullet per line
   status: TicketStatus;
   jogId: string;           // always set, never null
+  epicId: string | null;   // optional; a ticket belongs to at most one epic
   priority: Priority;
   dueDate: string | null;  // ISO date
   tags: string[];
@@ -72,6 +83,21 @@ interface Ticket {
   updatedAt: string;       // ISO
 }
 ```
+
+## Epic Fields
+
+Name plus a lifecycle flag; no dates, no manual ordering — epics are grouped by topic, not sequenced in time like jogs.
+
+```ts
+interface Epic {
+  id: string;
+  name: string;
+  isArchived: boolean;
+  createdAt: string; // ISO
+}
+```
+
+On the ticket card, an assigned epic shows as a right-justified chip (brighter/indigo, distinct from the gray tag chips) so it stands out from tags at a glance.
 
 ## Jog Fields
 
@@ -106,7 +132,7 @@ Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via a
 
 - **Database**: GCP Firestore via `@google-cloud/firestore` (plain GCP, not the Firebase SDK). Credentials via `GCP_PROJECT_ID` / `GCP_CLIENT_EMAIL` / `GCP_PRIVATE_KEY`.
 - Pages are server components doing the initial Firestore read directly; interactive pieces are client components that mutate via API routes and update local state optimistically. No SWR/React Query — dataset is small and single-user.
-- A `JogsContext` provider (mounted once in `layout.tsx`) shares one live jogs list across the board selector, backlog row dropdowns, and the ticket modal, instead of each fetching/duplicating it.
+- A `JogsContext` provider (mounted once in `layout.tsx`) shares one live jogs list across the board selector, backlog row dropdowns, and the ticket modal, instead of each fetching/duplicating it. An `EpicsContext` provider, mounted alongside it, does the same for epics.
 
 ## Deployment
 
@@ -128,5 +154,6 @@ _TBD — GitHub + Vercel auto-deploy vs Vercel CLI; GCP Firestore project setup 
 - [x] Full-height layout: header fixed, board columns / lists fill to viewport bottom with internal scroll
 - [x] GCP project (`tim-tickets-505200`) + Firestore (`australia-southeast1`, Native mode) set up, billing linked with a $5/mo budget alert
 - [x] `npm run build` / `npm run lint` pass; smoke-tested locally against real Firestore
+- [x] Add Epics: data layer, API routes, `EpicsContext`, `EpicSelect`/`EpicModal`, `/epics` (`EpicsList`), epic filter on board + backlog, epic chip on ticket cards, archive-cascade
 - [ ] Set up Vercel project + env vars
 - [ ] Decide deployment method

@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
@@ -14,12 +16,14 @@ const SELECTED_JOG_STORAGE_KEY = 'tt_selected_jog_id';
 
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
+  const { epics } = useEpics();
   const [tickets, setTickets] = useState(initialTickets);
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [filterText, setFilterText] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [epicFilter, setEpicFilter] = useState('all');
   const hasRestoredSelection = useRef(false);
 
   if (initialTickets !== prevInitialTickets) {
@@ -56,6 +60,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   // extra state/effect is needed to keep it in sync.
   const effectiveJogId = jogs.some((jog) => jog.id === selectedJogId) ? selectedJogId : (jogs[0]?.id ?? '');
   const selectedJog = jogs.find((jog) => jog.id === effectiveJogId);
+  const visibleEpics = useMemo(() => epics.filter((epic) => showArchived || !epic.isArchived), [epics, showArchived]);
 
   const ticketsByStatus = useMemo(() => {
     const grouped: Record<TicketStatus, Ticket[]> = {
@@ -70,6 +75,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     for (const ticket of sorted) {
       if (ticket.jogId !== effectiveJogId) continue;
       if (ticket.isArchived && !showArchived) continue;
+      if (epicFilter !== 'all' && (epicFilter === 'none' ? ticket.epicId : ticket.epicId !== epicFilter)) continue;
       if (query) {
         const matches =
           ticket.title.toLowerCase().includes(query) || ticket.tags.some((tag) => tag.toLowerCase().includes(query));
@@ -78,7 +84,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       grouped[ticket.status].push(ticket);
     }
     return grouped;
-  }, [tickets, effectiveJogId, filterText, showArchived]);
+  }, [tickets, effectiveJogId, filterText, showArchived, epicFilter]);
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -169,10 +175,27 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
         <JogSelect value={effectiveJogId} onChange={handleSelectJog} className="w-64" includeArchived={showArchived} />
         {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {selectedJog.startDate ?? '…'} → {selectedJog.endDate ?? '…'}
-          </span>
+          <div className="flex flex-col text-xs leading-tight text-gray-500 dark:text-gray-400">
+            <span>{selectedJog.startDate ?? '…'}</span>
+            <span>{selectedJog.endDate ?? '…'}</span>
+          </div>
         )}
+        <div className="relative">
+          <select
+            value={epicFilter}
+            onChange={(event) => setEpicFilter(event.target.value)}
+            className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          >
+            <option value="all">All epics</option>
+            <option value="none">No epic</option>
+            {visibleEpics.map((epic) => (
+              <option key={epic.id} value={epic.id}>
+                {epic.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+        </div>
         <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
           <input
             type="checkbox"

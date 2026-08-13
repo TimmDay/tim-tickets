@@ -7,6 +7,7 @@ const createTicketSchema = z.object({
   body: z.string().default(''),
   acceptanceCriteria: z.string().default(''),
   jogId: z.string().min(1),
+  epicId: z.string().nullable().default(null),
   priority: z.enum(['low', 'medium', 'high']).nullable().default(null),
   dueDate: z.string().nullable().default(null),
   tags: z.array(z.string()).default([]),

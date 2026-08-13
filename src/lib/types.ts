@@ -15,6 +15,7 @@ export interface Ticket {
   acceptanceCriteria: string;
   status: TicketStatus;
   jogId: string;
+  epicId: string | null;
   priority: Priority | null;
   dueDate: string | null;
   tags: string[];
@@ -31,6 +32,13 @@ export interface Jog {
   startDate: string | null;
   endDate: string | null;
   order: number;
+  isArchived: boolean;
+  createdAt: string;
+}
+
+export interface Epic {
+  id: string;
+  name: string;
   isArchived: boolean;
   createdAt: string;
 }

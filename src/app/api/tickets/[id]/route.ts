@@ -8,6 +8,7 @@ const updateTicketSchema = z.object({
   acceptanceCriteria: z.string().optional(),
   status: z.enum(['todo', 'in_progress', 'blocked', 'in_review', 'done']).optional(),
   jogId: z.string().min(1).optional(),
+  epicId: z.string().nullable().optional(),
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
   dueDate: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),

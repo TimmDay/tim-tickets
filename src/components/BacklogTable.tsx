@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ArchiveIcon } from './ArchiveIcon';
@@ -21,6 +22,7 @@ type SortDirection = 'asc' | 'desc';
 
 export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
+  const { epics } = useEpics();
   const [tickets, setTickets] = useState(initialTickets);
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
 
@@ -31,6 +33,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   const [search, setSearch] = useState('');
   const [jogFilter, setJogFilter] = useState('all');
+  const [epicFilter, setEpicFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
@@ -40,13 +43,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const jogNameById = useMemo(() => new Map(jogs.map((jog) => [jog.id, jog.name])), [jogs]);
   const statusLabelByValue = useMemo(() => new Map(STATUSES.map((s) => [s.value, s.label])), []);
   const visibleJogs = useMemo(() => jogs.filter((jog) => showArchived || !jog.isArchived), [jogs, showArchived]);
+  const visibleEpics = useMemo(() => epics.filter((epic) => showArchived || !epic.isArchived), [epics, showArchived]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   // Reordering assumes visibleTickets is exactly the full underlying list (just re-sorted),
   // so it can safely be disabled whenever any filter — including "hide archived", which is
   // the default — narrows what's shown.
-  const canReorder = sortKey === 'manual' && !search.trim() && jogFilter === 'all' && !showArchived;
+  const canReorder =
+    sortKey === 'manual' && !search.trim() && jogFilter === 'all' && epicFilter === 'all' && !showArchived;
 
   function toggleSort(key: Exclude<SortKey, 'manual'>) {
     if (sortKey === key) {
@@ -76,6 +81,10 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
       result = result.filter((ticket) => ticket.jogId === jogFilter);
     }
 
+    if (epicFilter !== 'all') {
+      result = result.filter((ticket) => (epicFilter === 'none' ? !ticket.epicId : ticket.epicId === epicFilter));
+    }
+
     const direction = sortDirection === 'asc' ? 1 : -1;
     result = [...result].sort((a, b) => {
       if (sortKey === 'manual') return a.order - b.order;
@@ -89,7 +98,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
     });
 
     return result;
-  }, [tickets, search, jogFilter, sortKey, sortDirection, jogNameById, showArchived]);
+  }, [tickets, search, jogFilter, epicFilter, sortKey, sortDirection, jogNameById, showArchived]);
 
   async function handleReassign(ticketId: string, jogId: string) {
     setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, jogId } : t)));
@@ -179,6 +188,22 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
             {visibleJogs.map((jog) => (
               <option key={jog.id} value={jog.id}>
                 {jog.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+        </div>
+        <div className="relative">
+          <select
+            value={epicFilter}
+            onChange={(event) => setEpicFilter(event.target.value)}
+            className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          >
+            <option value="all">All epics</option>
+            <option value="none">No epic</option>
+            {visibleEpics.map((epic) => (
+              <option key={epic.id} value={epic.id}>
+                {epic.name}
               </option>
             ))}
           </select>

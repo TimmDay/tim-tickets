@@ -3,6 +3,7 @@
 import { SubmitEvent, useEffect, useRef, useState } from 'react';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
+import { EpicSelect } from './EpicSelect';
 import { InfoIcon } from './InfoIcon';
 import { JogSelect } from './JogSelect';
 import { TagChip, TagInput } from './TagInput';
@@ -27,6 +28,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [acceptanceCriteria, setAcceptanceCriteria] = useState(ticket?.acceptanceCriteria ?? '');
   const acceptanceCriteriaRef = useRef<HTMLTextAreaElement>(null);
   const [jogId, setJogId] = useState(ticket?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
+  const [epicId, setEpicId] = useState<string | null>(ticket?.epicId ?? null);
   const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? null);
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
   const [dueDate, setDueDate] = useState(ticket?.dueDate ?? '');
@@ -57,6 +59,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       body,
       acceptanceCriteria,
       jogId,
+      epicId,
       priority,
       status,
       dueDate: dueDate || null,
@@ -255,16 +258,6 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
-                <input
-                  type="date"
-                  value={dueDate ?? ''}
-                  onChange={(event) => setDueDate(event.target.value)}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                />
-              </div>
-
-              <div>
                 <div className="mb-1 flex flex-wrap items-center gap-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
                   {tags.map((tag) => (
@@ -277,6 +270,21 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   options={BASE_TAGS}
                   placeholder="Type to search or add a tag…"
                   showChips={false}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
+                <EpicSelect value={epicId} onChange={setEpicId} />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
+                <input
+                  type="date"
+                  value={dueDate ?? ''}
+                  onChange={(event) => setDueDate(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
             </div>

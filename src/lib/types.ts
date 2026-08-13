@@ -40,6 +40,8 @@ export interface Epic {
   id: string;
   name: string;
   isArchived: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
 }
 
@@ -62,3 +64,6 @@ export const BASE_TAGS = ['Life-admin', 'Travel', 'Learn', 'Fun', 'Career', 'Soc
 export const DEFAULT_JOG_NAME = 'backlog';
 
 export const ORDER_GAP = 1000;
+
+/** Sentinel jog-select value meaning "don't scope the board to a single jog". */
+export const ALL_JOGS_ID = 'all';

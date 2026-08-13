@@ -2,16 +2,26 @@
 
 import { useState } from 'react';
 import { useJogs } from '@/lib/JogsContext';
-import { Jog } from '@/lib/types';
+import { ALL_JOGS_ID, Jog } from '@/lib/types';
 
 interface JogSelectProps {
   value: string;
   onChange: (jogId: string) => void;
   className?: string;
   includeArchived?: boolean;
+  /** Adds an "All tickets" option (value `ALL_JOGS_ID`) for board-style filters that can
+   * span every jog at once. Ticket-assignment selects (e.g. in the ticket modal) must
+   * always resolve to a real jog, so they leave this off. */
+  includeAllOption?: boolean;
 }
 
-export function JogSelect({ value, onChange, className, includeArchived = false }: JogSelectProps) {
+export function JogSelect({
+  value,
+  onChange,
+  className,
+  includeArchived = false,
+  includeAllOption = false,
+}: JogSelectProps) {
   const { jogs, createJog } = useJogs();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -38,6 +48,11 @@ export function JogSelect({ value, onChange, className, includeArchived = false 
     closeAndReset();
   }
 
+  function selectAll() {
+    onChange(ALL_JOGS_ID);
+    closeAndReset();
+  }
+
   async function handleCreate() {
     const name = newName.trim();
     if (!name) return;
@@ -53,7 +68,7 @@ export function JogSelect({ value, onChange, className, includeArchived = false 
         onClick={() => setOpen((prev) => !prev)}
         className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
       >
-        {selected?.name ?? 'Select jog'}
+        {includeAllOption && value === ALL_JOGS_ID ? 'All tickets' : (selected?.name ?? 'Select jog')}
       </button>
 
       {open && (
@@ -76,6 +91,21 @@ export function JogSelect({ value, onChange, className, includeArchived = false 
                   </button>
                 </li>
               ))}
+              {includeAllOption && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={selectAll}
+                    className={`block w-full border-t border-gray-100 px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-700 ${
+                      value === ALL_JOGS_ID
+                        ? 'font-medium text-gray-900 dark:text-gray-100'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    All tickets
+                  </button>
+                </li>
+              )}
             </ul>
             <div className="border-t border-gray-100 p-2 dark:border-gray-700">
               {adding ? (

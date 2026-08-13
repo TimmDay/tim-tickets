@@ -1,12 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useEpics } from '@/lib/EpicsContext';
 import { ConfirmModal } from './ConfirmModal';
 import { EpicModal } from './EpicModal';
 import { FilterInput } from './FilterInput';
+import { PencilIcon } from './PencilIcon';
 import { TrashIcon } from './TrashIcon';
-import { Epic } from '@/lib/types';
+import { ALL_JOGS_ID, Epic } from '@/lib/types';
+
+function formatDate(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString() : '—';
+}
 
 interface EpicsListProps {
   ticketCounts: Record<string, number>;
@@ -87,6 +93,9 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
             <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
               <tr>
                 <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Created</th>
+                <th className="px-3 py-2 font-medium">Started</th>
+                <th className="px-3 py-2 font-medium">Completed</th>
                 <th className="px-3 py-2 font-medium">Tickets</th>
                 <th className="px-3 py-2 font-medium" />
                 <th className="w-8 px-2 py-2" />
@@ -105,7 +114,7 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
               ))}
               {displayedEpics.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
                     No epics yet.
                   </td>
                 </tr>
@@ -169,13 +178,20 @@ interface EpicRowProps {
 function EpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProps) {
   return (
     <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60">
-      <td
-        className={`px-3 py-2 font-medium ${
-          epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
-        }`}
-      >
-        {epic.name}
+      <td className="px-3 py-2 font-medium">
+        <Link
+          href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}
+          title="View on Current Jog board"
+          className={`hover:underline ${
+            epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+          }`}
+        >
+          {epic.name}
+        </Link>
       </td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.createdAt)}</td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.startedAt)}</td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.completedAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{ticketCount}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-3">
@@ -223,28 +239,41 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={onEdit}
+        <Link
+          href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}
+          title="View on Current Jog board"
           className={`text-left text-sm font-medium hover:underline ${
             epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
           }`}
         >
           {epic.name}
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="shrink-0 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
-          aria-label="Delete epic"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            aria-label="Edit epic"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+            aria-label="Delete epic"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-500">
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           {ticketCount} ticket{ticketCount === 1 ? '' : 's'}
         </span>
+        <span>Created {formatDate(epic.createdAt)}</span>
+        <span>Started {formatDate(epic.startedAt)}</span>
+        <span>Completed {formatDate(epic.completedAt)}</span>
       </div>
       <div className="mt-2">
         <button

@@ -44,6 +44,8 @@ function toEpic(doc: QueryDocumentSnapshot): Epic {
     id: doc.id,
     name: data.name,
     isArchived: data.isArchived ?? false,
+    startedAt: data.startedAt ?? null,
+    completedAt: data.completedAt ?? null,
     createdAt: data.createdAt,
   };
 }
@@ -174,7 +176,7 @@ export async function getEpics(): Promise<Epic[]> {
 
 export async function createEpic(name: string): Promise<Epic> {
   const now = new Date().toISOString();
-  const data = { name, isArchived: false, createdAt: now };
+  const data = { name, isArchived: false, startedAt: null, completedAt: null, createdAt: now };
   const ref = await epicsCollection().add(data);
   return { id: ref.id, ...data };
 }
@@ -200,7 +202,7 @@ export async function archiveEpic(id: string): Promise<void> {
   const batch = getFirestore().batch();
   const now = new Date().toISOString();
 
-  batch.update(epicsCollection().doc(id), { isArchived: true });
+  batch.update(epicsCollection().doc(id), { isArchived: true, completedAt: now });
 
   memberTickets.docs.forEach((doc) => {
     batch.update(doc.ref, { isArchived: true, updatedAt: now });
@@ -273,9 +275,24 @@ export interface UpdateTicketInput {
 }
 
 export async function updateTicket(id: string, input: UpdateTicketInput): Promise<void> {
+  const now = new Date().toISOString();
+
+  // First time any ticket in an epic moves off `todo`, stamp the epic as started.
+  if (input.status && input.status !== 'todo') {
+    const ticketRef = ticketsCollection().doc(id);
+    const epicId = input.epicId !== undefined ? input.epicId : (await ticketRef.get()).data()?.epicId;
+    if (epicId) {
+      const epicRef = epicsCollection().doc(epicId);
+      const epicSnap = await epicRef.get();
+      if (epicSnap.exists && !epicSnap.data()?.startedAt) {
+        await epicRef.update({ startedAt: now });
+      }
+    }
+  }
+
   await ticketsCollection()
     .doc(id)
-    .update({ ...input, updatedAt: new Date().toISOString() });
+    .update({ ...input, updatedAt: now });
 }
 
 export async function deleteTicket(id: string): Promise<void> {

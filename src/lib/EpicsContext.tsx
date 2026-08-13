@@ -62,7 +62,11 @@ export function EpicsProvider({
 
   const archiveEpic = useCallback(async (id: string) => {
     await fetch(`/api/epics/${id}/archive`, { method: 'POST' });
-    setEpics((prev) => prev.map((epic) => (epic.id === id ? { ...epic, isArchived: true } : epic)));
+    setEpics((prev) =>
+      prev.map((epic) =>
+        epic.id === id ? { ...epic, isArchived: true, completedAt: new Date().toISOString() } : epic,
+      ),
+    );
   }, []);
 
   return (

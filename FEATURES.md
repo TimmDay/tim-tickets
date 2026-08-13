@@ -13,8 +13,9 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ## Pages
 
 ### `/` — Current Jog board
-- Dropdown at the top selects which jog to view (defaults to "Default Jog" or the first jog).
+- Dropdown at the top selects which jog to view (defaults to "Default Jog" or the first jog), or "All tickets" (listed last, below the jogs) to show every ticket unscoped by jog.
 - A second dropdown filters the board by epic (All epics / No epic / a specific epic).
+- Clicking a jog's or epic's title on the Jogs/Epics pages navigates here with that filter pre-applied — a jog click selects that jog in the first dropdown; an epic click selects "All tickets" + that epic, via `?jogId=`/`?epicId=` query params consumed once on mount and then stripped from the URL.
 - Five fixed columns: `todo`, `in_progress`, `blocked`, `in_review`, `done`, populated with tickets whose `jogId` matches the selected jog.
 - Cards are draggable both across columns (updates `status`) and within a column (reorders `order`), via `@dnd-kit/sortable`'s multi-container pattern.
 - Clicking a card opens it in the edit modal (includes Delete, and a Comments section — see below).
@@ -35,7 +36,8 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Table fills the full remaining viewport height with internal scroll.
 
 ### `/epics` — Epics list
-- Table of every epic: name, ticket count.
+- Table of every epic: name, created date, started date, completed date, ticket count.
+- Clicking an epic's name navigates to the Current Jog board with the jog dropdown set to "All tickets" and the epic filter set to this epic (see below).
 - Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing only changes the epic's name.
 - Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
 - Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
@@ -86,18 +88,20 @@ interface Ticket {
 
 ## Epic Fields
 
-Name plus a lifecycle flag; no dates, no manual ordering — epics are grouped by topic, not sequenced in time like jogs.
+Name plus a lifecycle flag; no manual ordering — epics are grouped by topic, not sequenced in time like jogs. `startedAt` is stamped automatically (not user-set) the first time any member ticket's status moves off `todo` (set in `updateTicket`, once — never overwritten after). `completedAt` is stamped when the epic is archived.
 
 ```ts
 interface Epic {
   id: string;
   name: string;
   isArchived: boolean;
-  createdAt: string; // ISO
+  startedAt: string | null;   // ISO; auto-set once, first ticket to leave `todo`
+  completedAt: string | null; // ISO; set when the epic is archived
+  createdAt: string;          // ISO
 }
 ```
 
-On the ticket card, an assigned epic shows as a right-justified chip (brighter/indigo, distinct from the gray tag chips) so it stands out from tags at a glance.
+On the ticket card, an assigned epic shows as a chip, distinct in color from the gray tag chips, so it stands out from tags at a glance.
 
 ## Jog Fields
 

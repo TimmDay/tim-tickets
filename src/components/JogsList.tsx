@@ -4,12 +4,14 @@ import { useMemo, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import Link from 'next/link';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ConfirmModal } from './ConfirmModal';
 import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
 import { JogModal } from './JogModal';
+import { PencilIcon } from './PencilIcon';
 import { TrashIcon } from './TrashIcon';
 import { Jog } from '@/lib/types';
 
@@ -229,12 +231,16 @@ function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onCompl
           <GripIcon className="h-4 w-4" />
         </button>
       </td>
-      <td
-        className={`px-3 py-2 font-medium ${
-          jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
-        }`}
-      >
-        {jog.name}
+      <td className="px-3 py-2 font-medium">
+        <Link
+          href={`/?jogId=${jog.id}`}
+          title="View on Current Jog board"
+          className={`hover:underline ${
+            jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+          }`}
+        >
+          {jog.name}
+        </Link>
       </td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.startDate ?? '—'}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.endDate ?? '—'}</td>
@@ -294,27 +300,39 @@ function JogCard({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete }: 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={onEdit}
+        <Link
+          href={`/?jogId=${jog.id}`}
+          title="View on Current Jog board"
           className={`text-left text-sm font-medium hover:underline ${
             jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
           }`}
         >
           {jog.name}
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={isDefault}
-          title={isDefault ? "Can't delete the default jog" : undefined}
-          className={`shrink-0 text-gray-400 dark:text-gray-500 ${
-            isDefault ? 'cursor-not-allowed opacity-30' : 'hover:text-red-600 dark:hover:text-red-400'
-          }`}
-          aria-label="Delete jog"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            aria-label="Edit jog"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isDefault}
+            title={isDefault ? "Can't delete the default jog" : undefined}
+            className={
+              isDefault
+                ? 'cursor-not-allowed text-gray-400 opacity-30 dark:text-gray-500'
+                : 'text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400'
+            }
+            aria-label="Delete jog"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-500">
         {(jog.startDate || jog.endDate) && (

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
@@ -10,13 +11,15 @@ import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
 import { TicketModal } from './TicketModal';
-import { ORDER_GAP, STATUSES, Ticket, TicketStatus } from '@/lib/types';
+import { ALL_JOGS_ID, ORDER_GAP, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 const SELECTED_JOG_STORAGE_KEY = 'tt_selected_jog_id';
 
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
   const { epics } = useEpics();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [tickets, setTickets] = useState(initialTickets);
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
@@ -31,22 +34,47 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     setTickets(initialTickets);
   }
 
-  // Restore a previously-selected jog from localStorage once the jogs list is available.
-  // This must happen post-mount (not during the initial render) since localStorage isn't
-  // available during server rendering and reading it there would cause a hydration mismatch.
+  // Restore a previously-selected jog once the jogs list is available. A `jogId` (and/or
+  // `epicId`) query param — e.g. from clicking a jog/epic title on the Jogs/Epics pages —
+  // takes priority over whatever was last persisted to localStorage; either way this must
+  // happen post-mount (not during the initial render) since localStorage isn't available
+  // during server rendering and reading it there would cause a hydration mismatch.
   useEffect(() => {
     if (hasRestoredSelection.current) return;
     hasRestoredSelection.current = true;
-    const stored = localStorage.getItem(SELECTED_JOG_STORAGE_KEY);
-    if (!stored) return;
-    if (jogs.some((jog) => jog.id === stored)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring from localStorage genuinely cannot happen during render without a hydration mismatch
-      setSelectedJogId(stored);
+
+    const jogIdParam = searchParams.get('jogId');
+    const epicIdParam = searchParams.get('epicId');
+
+    let jogIdToApply: string | null = null;
+    if (jogIdParam && (jogIdParam === ALL_JOGS_ID || jogs.some((jog) => jog.id === jogIdParam))) {
+      jogIdToApply = jogIdParam;
     } else {
-      // The jog this pointed to no longer exists (e.g. deleted since we last saved it) — drop the stale entry.
-      localStorage.removeItem(SELECTED_JOG_STORAGE_KEY);
+      const stored = localStorage.getItem(SELECTED_JOG_STORAGE_KEY);
+      if (stored) {
+        if (stored === ALL_JOGS_ID || jogs.some((jog) => jog.id === stored)) {
+          jogIdToApply = stored;
+        } else {
+          // The jog this pointed to no longer exists (e.g. deleted since we last saved it) — drop the stale entry.
+          localStorage.removeItem(SELECTED_JOG_STORAGE_KEY);
+        }
+      }
     }
-  }, [jogs]);
+
+    if (jogIdToApply) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring/applying selection genuinely cannot happen during render without a hydration mismatch
+      setSelectedJogId(jogIdToApply);
+      localStorage.setItem(SELECTED_JOG_STORAGE_KEY, jogIdToApply);
+    }
+
+    if (epicIdParam) {
+      setEpicFilter(epicIdParam);
+    }
+
+    if (jogIdParam || epicIdParam) {
+      router.replace('/', { scroll: false });
+    }
+  }, [jogs, searchParams, router]);
 
   function handleSelectJog(jogId: string) {
     setSelectedJogId(jogId);
@@ -57,8 +85,12 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
 
   // Falls back to the first jog if the selected one is no longer valid (deleted, or restored
   // from a stale localStorage entry before the jogs list loaded) — derived at use-time so no
-  // extra state/effect is needed to keep it in sync.
-  const effectiveJogId = jogs.some((jog) => jog.id === selectedJogId) ? selectedJogId : (jogs[0]?.id ?? '');
+  // extra state/effect is needed to keep it in sync. ALL_JOGS_ID is always valid since it
+  // doesn't reference a specific jog.
+  const effectiveJogId =
+    selectedJogId === ALL_JOGS_ID || jogs.some((jog) => jog.id === selectedJogId)
+      ? selectedJogId
+      : (jogs[0]?.id ?? '');
   const selectedJog = jogs.find((jog) => jog.id === effectiveJogId);
   const visibleEpics = useMemo(() => epics.filter((epic) => showArchived || !epic.isArchived), [epics, showArchived]);
 
@@ -73,7 +105,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     const sorted = [...tickets].sort((a, b) => a.order - b.order);
     const query = filterText.trim().toLowerCase();
     for (const ticket of sorted) {
-      if (ticket.jogId !== effectiveJogId) continue;
+      if (effectiveJogId !== ALL_JOGS_ID && ticket.jogId !== effectiveJogId) continue;
       if (ticket.isArchived && !showArchived) continue;
       if (epicFilter !== 'all' && (epicFilter === 'none' ? ticket.epicId : ticket.epicId !== epicFilter)) continue;
       if (query) {
@@ -173,7 +205,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
-        <JogSelect value={effectiveJogId} onChange={handleSelectJog} className="w-64" includeArchived={showArchived} />
+        <JogSelect
+          value={effectiveJogId}
+          onChange={handleSelectJog}
+          className="w-64"
+          includeArchived={showArchived}
+          includeAllOption
+        />
         {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
           <div className="flex flex-col text-xs leading-tight text-gray-500 dark:text-gray-400">
             <span>{selectedJog.startDate ?? '…'}</span>

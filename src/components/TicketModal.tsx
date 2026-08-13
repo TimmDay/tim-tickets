@@ -1,8 +1,9 @@
 'use client';
 
-import { SubmitEvent, useState } from 'react';
+import { SubmitEvent, useEffect, useRef, useState } from 'react';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
+import { InfoIcon } from './InfoIcon';
 import { JogSelect } from './JogSelect';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
@@ -23,6 +24,8 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
 
   const [title, setTitle] = useState(ticket?.title ?? '');
   const [body, setBody] = useState(ticket?.body ?? '');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState(ticket?.acceptanceCriteria ?? '');
+  const acceptanceCriteriaRef = useRef<HTMLTextAreaElement>(null);
   const [jogId, setJogId] = useState(ticket?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
   const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? null);
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
@@ -36,6 +39,13 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [addingComment, setAddingComment] = useState(false);
   const [deletingComment, setDeletingComment] = useState<Comment | null>(null);
 
+  useEffect(() => {
+    const el = acceptanceCriteriaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [acceptanceCriteria]);
+
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     if (!title.trim() || !jogId) return;
@@ -45,6 +55,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     const payload = {
       title: title.trim(),
       body,
+      acceptanceCriteria,
       jogId,
       priority,
       status,
@@ -184,6 +195,34 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   onChange={(event) => setBody(event.target.value)}
                   rows={10}
                   className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Acceptance Criteria
+                  </label>
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    aria-label="What is Acceptance Criteria?"
+                    className="group relative inline-flex text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    <InfoIcon className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 w-64 -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100 dark:bg-gray-700">
+                      One per line. Each line should be a concrete, testable condition — for a dev task, think of
+                      each line as a test someone could check off.
+                    </span>
+                  </button>
+                </div>
+                <textarea
+                  ref={acceptanceCriteriaRef}
+                  value={acceptanceCriteria}
+                  onChange={(event) => setAcceptanceCriteria(event.target.value)}
+                  rows={3}
+                  placeholder={'e.g.\n- [ ] GIVEN x WHEN y THEN z\n- [ ] returns 400 bad Request if email field is missing'}
+                  className="w-full resize-none overflow-hidden rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
             </div>

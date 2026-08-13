@@ -12,6 +12,7 @@ export interface Ticket {
   id: string;
   title: string;
   body: string;
+  acceptanceCriteria: string;
   status: TicketStatus;
   jogId: string;
   priority: Priority | null;

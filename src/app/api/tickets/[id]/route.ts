@@ -5,6 +5,7 @@ import { deleteTicket, updateTicket } from '@/lib/firestore';
 const updateTicketSchema = z.object({
   title: z.string().trim().min(1).optional(),
   body: z.string().optional(),
+  acceptanceCriteria: z.string().optional(),
   status: z.enum(['todo', 'in_progress', 'blocked', 'in_review', 'done']).optional(),
   jogId: z.string().min(1).optional(),
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),

@@ -13,6 +13,12 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 };
 
+const PRIORITY_LABELS: Record<Priority, string> = {
+  low: '',
+  medium: '',
+  high: '',
+};
+
 const POPOVER_WIDTH = 224; // matches w-56
 
 export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
@@ -56,6 +62,15 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
         isDragging ? 'opacity-50' : ''
       }`}
     >
+      {ticket.priority && ticket.status !== 'done' && (
+        <span
+          title={`Priority: ${ticket.priority}`}
+          className={`absolute -right-1.5 -bottom-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] leading-none font-bold ring-2 ring-white dark:ring-gray-800 ${PRIORITY_COLORS[ticket.priority]}`}
+        >
+          {PRIORITY_LABELS[ticket.priority]}
+        </span>
+      )}
+
       {ticket.comments.length > 0 && (
         <div
           className="absolute top-1 right-1"
@@ -81,9 +96,6 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
         {ticket.title}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-1">
-        {ticket.priority && (
-          <span className={`rounded px-1.5 py-0.5 text-xs ${PRIORITY_COLORS[ticket.priority]}`}>{ticket.priority}</span>
-        )}
         {ticket.tags.map((tag) => (
           <span key={tag} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
             {tag}

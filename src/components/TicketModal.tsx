@@ -237,24 +237,8 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-                <div className="relative">
-                  <select
-                    value={priority ?? ''}
-                    onChange={(event) =>
-                      setPriority(event.target.value === '' ? null : (event.target.value as Priority))
-                    }
-                    className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                  >
-                    <option value="">No priority</option>
-                    {PRIORITIES.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                </div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
+                <EpicSelect value={epicId} onChange={setEpicId} />
               </div>
 
               <div>
@@ -274,8 +258,24 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
-                <EpicSelect value={epicId} onChange={setEpicId} />
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+                <div className="relative">
+                  <select
+                    value={priority ?? ''}
+                    onChange={(event) =>
+                      setPriority(event.target.value === '' ? null : (event.target.value as Priority))
+                    }
+                    className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  >
+                    <option value="">No priority</option>
+                    {PRIORITIES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
               </div>
 
               <div>

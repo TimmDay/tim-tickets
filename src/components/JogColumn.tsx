@@ -40,7 +40,7 @@ export function JogColumn({ status, label, tickets, onSelectTicket }: JogColumnP
       </div>
       {!collapsed && (
         <SortableContext items={tickets.map((ticket) => ticket.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2 pt-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <div className="space-y-3 p-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {tickets.map((ticket) => (
               <TicketCard key={ticket.id} ticket={ticket} onClick={() => onSelectTicket(ticket)} />
             ))}

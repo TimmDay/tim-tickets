@@ -137,7 +137,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
+        className="w-full max-w-3xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -164,76 +164,83 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              autoFocus
-              required
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            />
-          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="space-y-3 lg:col-span-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  autoFocus
+                  required
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
-            <textarea
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              rows={4}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
-              <JogSelect value={jogId} onChange={setJogId} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-              <div className="relative">
-                <select
-                  value={priority ?? ''}
-                  onChange={(event) => setPriority(event.target.value === '' ? null : (event.target.value as Priority))}
-                  className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                >
-                  <option value="">No priority</option>
-                  {PRIORITIES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
+                <textarea
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  rows={10}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
               </div>
             </div>
-          </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
-            <input
-              type="date"
-              value={dueDate ?? ''}
-              onChange={(event) => setDueDate(event.target.value)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            />
-          </div>
+            <div className="space-y-3 lg:col-span-1">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
+                <JogSelect value={jogId} onChange={setJogId} />
+              </div>
 
-          <div>
-            <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
-              {tags.map((tag) => (
-                <TagChip key={tag} tag={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))} />
-              ))}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+                <div className="relative">
+                  <select
+                    value={priority ?? ''}
+                    onChange={(event) =>
+                      setPriority(event.target.value === '' ? null : (event.target.value as Priority))
+                    }
+                    className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  >
+                    <option value="">No priority</option>
+                    {PRIORITIES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
+                <input
+                  type="date"
+                  value={dueDate ?? ''}
+                  onChange={(event) => setDueDate(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
+                  {tags.map((tag) => (
+                    <TagChip key={tag} tag={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))} />
+                  ))}
+                </div>
+                <TagInput
+                  value={tags}
+                  onChange={setTags}
+                  options={BASE_TAGS}
+                  placeholder="Type to search or add a tag…"
+                  showChips={false}
+                />
+              </div>
             </div>
-            <TagInput
-              value={tags}
-              onChange={setTags}
-              options={BASE_TAGS}
-              placeholder="Type to search or add a tag…"
-              showChips={false}
-            />
           </div>
 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

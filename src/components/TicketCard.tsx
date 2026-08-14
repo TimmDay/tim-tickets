@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { EpicChip } from './EpicChip';
 import { useEpics } from '@/lib/EpicsContext';
 import { Priority, Ticket } from '@/lib/types';
 
@@ -23,7 +24,7 @@ const POPOVER_WIDTH = 224; // matches w-56
 
 export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
   const { epics } = useEpics();
-  const epicName = epics.find((epic) => epic.id === ticket.epicId)?.name;
+  const epic = epics.find((epic) => epic.id === ticket.epicId);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
     disabled: ticket.isArchived,
@@ -101,11 +102,7 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
             {tag}
           </span>
         ))}
-        {epicName && (
-          <span className="ml-auto rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
-            {epicName}
-          </span>
-        )}
+        {epic && <EpicChip epic={epic} className="ml-auto" />}
       </div>
 
       {popoverPosition &&

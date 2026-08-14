@@ -10,12 +10,13 @@ import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
+import { EpicChip } from './EpicChip';
 import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
 import { JogSelect } from './JogSelect';
 import { TicketModal } from './TicketModal';
 import { TrashIcon } from './TrashIcon';
-import { ORDER_GAP, STATUSES, Ticket } from '@/lib/types';
+import { Epic, ORDER_GAP, STATUSES, Ticket } from '@/lib/types';
 
 type SortKey = 'manual' | 'title' | 'jog' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
@@ -41,6 +42,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const [showArchived, setShowArchived] = useState(false);
 
   const jogNameById = useMemo(() => new Map(jogs.map((jog) => [jog.id, jog.name])), [jogs]);
+  const epicById = useMemo(() => new Map(epics.map((epic) => [epic.id, epic])), [epics]);
   const statusLabelByValue = useMemo(() => new Map(STATUSES.map((s) => [s.value, s.label])), []);
   const visibleJogs = useMemo(() => jogs.filter((jog) => showArchived || !jog.isArchived), [jogs, showArchived]);
   const visibleEpics = useMemo(() => epics.filter((epic) => showArchived || !epic.isArchived), [epics, showArchived]);
@@ -251,6 +253,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
                       ticket={ticket}
                       disabled={!canReorder}
                       statusLabel={statusLabelByValue.get(ticket.status)}
+                      epic={ticket.epicId ? epicById.get(ticket.epicId) : undefined}
                       onEdit={() => setEditingTicket(ticket)}
                       onDelete={() => setDeletingTicket(ticket)}
                       onReassign={(jogId) => handleReassign(ticket.id, jogId)}
@@ -277,6 +280,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
               key={ticket.id}
               ticket={ticket}
               statusLabel={statusLabelByValue.get(ticket.status)}
+              epic={ticket.epicId ? epicById.get(ticket.epicId) : undefined}
               onEdit={() => setEditingTicket(ticket)}
               onDelete={() => setDeletingTicket(ticket)}
               onReassign={(jogId) => handleReassign(ticket.id, jogId)}
@@ -314,6 +318,7 @@ interface SortableTicketRowProps {
   ticket: Ticket;
   disabled: boolean;
   statusLabel: string | undefined;
+  epic: Epic | undefined;
   onEdit: () => void;
   onDelete: () => void;
   onReassign: (jogId: string) => void;
@@ -324,6 +329,7 @@ function SortableTicketRow({
   ticket,
   disabled,
   statusLabel,
+  epic,
   onEdit,
   onDelete,
   onReassign,
@@ -364,6 +370,7 @@ function SortableTicketRow({
           }`}
         >
           {ticket.title}
+          {epic && <EpicChip epic={epic} className="ml-1.5 align-middle" />}
         </button>
       </td>
       <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{statusLabel}</td>
@@ -404,13 +411,14 @@ function SortableTicketRow({
 interface BacklogCardProps {
   ticket: Ticket;
   statusLabel: string | undefined;
+  epic: Epic | undefined;
   onEdit: () => void;
   onDelete: () => void;
   onReassign: (jogId: string) => void;
   onToggleArchive: () => void;
 }
 
-function BacklogCard({ ticket, statusLabel, onEdit, onDelete, onReassign, onToggleArchive }: BacklogCardProps) {
+function BacklogCard({ ticket, statusLabel, epic, onEdit, onDelete, onReassign, onToggleArchive }: BacklogCardProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-start justify-between gap-2">
@@ -422,6 +430,7 @@ function BacklogCard({ ticket, statusLabel, onEdit, onDelete, onReassign, onTogg
           }`}
         >
           {ticket.title}
+          {epic && <EpicChip epic={epic} className="ml-1.5 align-middle" />}
         </button>
         <div className="flex shrink-0 items-center gap-2">
           <button

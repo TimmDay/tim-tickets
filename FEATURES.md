@@ -91,9 +91,13 @@ interface Ticket {
 Name plus a lifecycle flag; no manual ordering — epics are grouped by topic, not sequenced in time like jogs. `startedAt` is stamped automatically (not user-set) the first time any member ticket's status moves off `todo` (set in `updateTicket`, once — never overwritten after). `completedAt` is stamped when the epic is archived.
 
 ```ts
+type EpicColorTheme = 'indigo' | 'blue' | 'emerald' | 'rose' | 'amber';
+
 interface Epic {
   id: string;
   name: string;
+  description: string;        // optional; shown as a tooltip on the epic chip
+  colorTheme: EpicColorTheme; // chosen in the epic create/edit modal; defaults to 'indigo'
   isArchived: boolean;
   startedAt: string | null;   // ISO; auto-set once, first ticket to leave `todo`
   completedAt: string | null; // ISO; set when the epic is archived
@@ -101,7 +105,7 @@ interface Epic {
 }
 ```
 
-On the ticket card, an assigned epic shows as a chip, distinct in color from the gray tag chips, so it stands out from tags at a glance.
+Wherever an epic appears as a chip (ticket cards on the Current Jog board, and inline after the title on the Backlog page), it's rendered via a shared `EpicChip` component: colored per the epic's `colorTheme`, with a custom CSS tooltip (not the native `title` attribute, which has a much longer hover delay) showing the epic's description on hover, when one is set. The epic create/edit modal has an `EpicColorThemeSelect` — a custom dropdown (not a native `<select>`, so each option can render as an actual colored chip preview) offering the 5 themes above.
 
 ## Jog Fields
 
@@ -159,5 +163,5 @@ _TBD — GitHub + Vercel auto-deploy vs Vercel CLI; GCP Firestore project setup 
 - [x] GCP project (`tim-tickets-505200`) + Firestore (`australia-southeast1`, Native mode) set up, billing linked with a $5/mo budget alert
 - [x] `npm run build` / `npm run lint` pass; smoke-tested locally against real Firestore
 - [x] Add Epics: data layer, API routes, `EpicsContext`, `EpicSelect`/`EpicModal`, `/epics` (`EpicsList`), epic filter on board + backlog, epic chip on ticket cards, archive-cascade
-- [ ] Set up Vercel project + env vars
-- [ ] Decide deployment method
+- [x] Set up Vercel project + env vars
+- [x] Decide deployment method (vercel for now)

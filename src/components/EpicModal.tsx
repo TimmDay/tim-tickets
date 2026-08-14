@@ -1,8 +1,9 @@
 'use client';
 
 import { SubmitEvent, useState } from 'react';
+import { EpicColorThemeSelect } from './EpicColorThemeSelect';
 import { useEpics } from '@/lib/EpicsContext';
-import { Epic } from '@/lib/types';
+import { DEFAULT_EPIC_COLOR_THEME, Epic } from '@/lib/types';
 
 interface EpicModalProps {
   epic?: Epic | null;
@@ -15,6 +16,8 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
   const isEditing = Boolean(epic);
 
   const [name, setName] = useState(epic?.name ?? '');
+  const [description, setDescription] = useState(epic?.description ?? '');
+  const [colorTheme, setColorTheme] = useState(epic?.colorTheme ?? DEFAULT_EPIC_COLOR_THEME);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: SubmitEvent) {
@@ -23,10 +26,10 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
     setSaving(true);
     try {
       if (isEditing) {
-        await updateEpic(epic!.id, name.trim());
+        await updateEpic(epic!.id, name.trim(), description, colorTheme);
         onSaved(epic!.id);
       } else {
-        const created = await createEpic(name.trim());
+        const created = await createEpic(name.trim(), description, colorTheme);
         onSaved(created.id);
       }
       onClose();
@@ -54,6 +57,22 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
               required
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              placeholder="Optional — shown as a tooltip on the epic chip"
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
+            <EpicColorThemeSelect value={colorTheme} onChange={setColorTheme} />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

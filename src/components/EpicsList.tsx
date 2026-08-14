@@ -8,7 +8,7 @@ import { EpicModal } from './EpicModal';
 import { FilterInput } from './FilterInput';
 import { PencilIcon } from './PencilIcon';
 import { TrashIcon } from './TrashIcon';
-import { ALL_JOGS_ID, Epic } from '@/lib/types';
+import { ALL_JOGS_ID, Epic, getEpicColorTheme } from '@/lib/types';
 
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString() : '—';
@@ -182,10 +182,11 @@ function EpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProp
         <Link
           href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}
           title="View on Current Jog board"
-          className={`hover:underline ${
+          className={`inline-flex items-center gap-1.5 hover:underline ${
             epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
           }`}
         >
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEpicColorTheme(epic.colorTheme).dotClassName}`} />
           {epic.name}
         </Link>
       </td>
@@ -242,10 +243,11 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
         <Link
           href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}
           title="View on Current Jog board"
-          className={`text-left text-sm font-medium hover:underline ${
+          className={`inline-flex items-center gap-1.5 text-left text-sm font-medium hover:underline ${
             epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
           }`}
         >
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEpicColorTheme(epic.colorTheme).dotClassName}`} />
           {epic.name}
         </Link>
         <div className="flex shrink-0 items-center gap-2">

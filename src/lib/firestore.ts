@@ -1,5 +1,16 @@
 import { FieldValue, Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
-import { Comment, DEFAULT_JOG_NAME, Epic, Jog, ORDER_GAP, Priority, Ticket, TicketStatus } from './types';
+import {
+  Comment,
+  DEFAULT_EPIC_COLOR_THEME,
+  DEFAULT_JOG_NAME,
+  Epic,
+  EpicColorTheme,
+  Jog,
+  ORDER_GAP,
+  Priority,
+  Ticket,
+  TicketStatus,
+} from './types';
 
 let firestore: Firestore | null = null;
 
@@ -43,6 +54,8 @@ function toEpic(doc: QueryDocumentSnapshot): Epic {
   return {
     id: doc.id,
     name: data.name,
+    description: data.description ?? '',
+    colorTheme: data.colorTheme ?? DEFAULT_EPIC_COLOR_THEME,
     isArchived: data.isArchived ?? false,
     startedAt: data.startedAt ?? null,
     completedAt: data.completedAt ?? null,
@@ -174,15 +187,33 @@ export async function getEpics(): Promise<Epic[]> {
   return snapshot.docs.map(toEpic);
 }
 
-export async function createEpic(name: string): Promise<Epic> {
+export async function createEpic(
+  name: string,
+  description: string = '',
+  colorTheme: EpicColorTheme = DEFAULT_EPIC_COLOR_THEME,
+): Promise<Epic> {
   const now = new Date().toISOString();
-  const data = { name, isArchived: false, startedAt: null, completedAt: null, createdAt: now };
+  const data = {
+    name,
+    description,
+    colorTheme,
+    isArchived: false,
+    startedAt: null,
+    completedAt: null,
+    createdAt: now,
+  };
   const ref = await epicsCollection().add(data);
   return { id: ref.id, ...data };
 }
 
-export async function updateEpic(id: string, name: string): Promise<void> {
-  await epicsCollection().doc(id).update({ name });
+export interface UpdateEpicInput {
+  name?: string;
+  description?: string;
+  colorTheme?: EpicColorTheme;
+}
+
+export async function updateEpic(id: string, input: UpdateEpicInput): Promise<void> {
+  await epicsCollection().doc(id).update({ ...input });
 }
 
 export async function deleteEpic(id: string): Promise<void> {

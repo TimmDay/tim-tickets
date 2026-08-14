@@ -1,13 +1,13 @@
 'use client';
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Epic } from './types';
+import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme } from './types';
 
 interface EpicsContextValue {
   epics: Epic[];
   refresh: () => Promise<void>;
-  createEpic: (name: string) => Promise<Epic>;
-  updateEpic: (id: string, name: string) => Promise<void>;
+  createEpic: (name: string, description?: string, colorTheme?: EpicColorTheme) => Promise<Epic>;
+  updateEpic: (id: string, name: string, description: string, colorTheme: EpicColorTheme) => Promise<void>;
   deleteEpic: (id: string) => Promise<void>;
   archiveEpic: (id: string) => Promise<void>;
 }
@@ -33,24 +33,27 @@ export function EpicsProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const createEpic = useCallback(async (name: string) => {
-    const response = await fetch('/api/epics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const epic: Epic = await response.json();
-    setEpics((prev) => [...prev, epic]);
-    return epic;
-  }, []);
+  const createEpic = useCallback(
+    async (name: string, description: string = '', colorTheme: EpicColorTheme = DEFAULT_EPIC_COLOR_THEME) => {
+      const response = await fetch('/api/epics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description, colorTheme }),
+      });
+      const epic: Epic = await response.json();
+      setEpics((prev) => [...prev, epic]);
+      return epic;
+    },
+    [],
+  );
 
-  const updateEpic = useCallback(async (id: string, name: string) => {
+  const updateEpic = useCallback(async (id: string, name: string, description: string, colorTheme: EpicColorTheme) => {
     await fetch(`/api/epics/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, description, colorTheme }),
     });
-    setEpics((prev) => prev.map((epic) => (epic.id === id ? { ...epic, name } : epic)));
+    setEpics((prev) => prev.map((epic) => (epic.id === id ? { ...epic, name, description, colorTheme } : epic)));
   }, []);
 
   const deleteEpic = useCallback(async (id: string) => {

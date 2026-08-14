@@ -149,9 +149,9 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 sm:p-4" onClick={onClose}>
       <div
-        className="w-full max-w-3xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
+        className="h-dvh w-full overflow-y-auto bg-white px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg sm:pb-6 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">

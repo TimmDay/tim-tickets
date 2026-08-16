@@ -1,7 +1,8 @@
 'use client';
 
-import { SubmitEvent, useState } from 'react';
+import { SubmitEvent, useEffect, useState } from 'react';
 import { useJogs } from '@/lib/JogsContext';
+import { clearDraft, getDraft, setDraft } from '@/lib/formDrafts';
 import { Jog } from '@/lib/types';
 
 interface JogModalProps {
@@ -10,14 +11,33 @@ interface JogModalProps {
   onSaved: (jogId: string) => void;
 }
 
+const NEW_JOG_DRAFT_KEY = 'jog:new';
+
+interface NewJogDraft {
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
 export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
   const { createJog, updateJog } = useJogs();
   const isEditing = Boolean(jog);
+  const draft = isEditing ? undefined : getDraft<NewJogDraft>(NEW_JOG_DRAFT_KEY);
 
-  const [name, setName] = useState(jog?.name ?? '');
-  const [startDate, setStartDate] = useState(jog?.startDate ?? '');
-  const [endDate, setEndDate] = useState(jog?.endDate ?? '');
+  const [name, setName] = useState(jog?.name ?? draft?.name ?? '');
+  const [startDate, setStartDate] = useState(jog?.startDate ?? draft?.startDate ?? '');
+  const [endDate, setEndDate] = useState(jog?.endDate ?? draft?.endDate ?? '');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setDraft<NewJogDraft>(NEW_JOG_DRAFT_KEY, { name, startDate, endDate });
+  }, [isEditing, name, startDate, endDate]);
+
+  function handleCancel() {
+    clearDraft(NEW_JOG_DRAFT_KEY);
+    onClose();
+  }
 
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -29,6 +49,7 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
         onSaved(jog!.id);
       } else {
         const created = await createJog(name.trim(), startDate || null, endDate || null);
+        clearDraft(NEW_JOG_DRAFT_KEY);
         onSaved(created.id);
       }
       onClose();
@@ -82,7 +103,7 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCancel}
               className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               Cancel

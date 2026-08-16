@@ -9,6 +9,7 @@ import { JogSelect } from './JogSelect';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
+import { clearDraft, getDraft, setDraft } from '@/lib/formDrafts';
 import { BASE_TAGS, Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 interface TicketModalProps {
@@ -19,22 +20,57 @@ interface TicketModalProps {
   onDeleted?: (ticketId: string) => void;
 }
 
+const NEW_TICKET_DRAFT_KEY = 'ticket:new';
+
+interface NewTicketDraft {
+  title: string;
+  body: string;
+  acceptanceCriteria: string;
+  jogId: string;
+  epicId: string | null;
+  priority: Priority | null;
+  dueDate: string;
+  tags: string[];
+}
+
 export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted }: TicketModalProps) {
   const { jogs } = useJogs();
   const isEditing = Boolean(ticket);
+  // Draft persistence only applies to new-ticket creation, not in-progress edits to an
+  // existing ticket, so this is only ever read when !isEditing.
+  const draft = isEditing ? undefined : getDraft<NewTicketDraft>(NEW_TICKET_DRAFT_KEY);
 
-  const [title, setTitle] = useState(ticket?.title ?? '');
-  const [body, setBody] = useState(ticket?.body ?? '');
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState(ticket?.acceptanceCriteria ?? '');
+  const [title, setTitle] = useState(ticket?.title ?? draft?.title ?? '');
+  const [body, setBody] = useState(ticket?.body ?? draft?.body ?? '');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState(ticket?.acceptanceCriteria ?? draft?.acceptanceCriteria ?? '');
   const acceptanceCriteriaRef = useRef<HTMLTextAreaElement>(null);
-  const [jogId, setJogId] = useState(ticket?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
-  const [epicId, setEpicId] = useState<string | null>(ticket?.epicId ?? null);
-  const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? null);
+  const [jogId, setJogId] = useState(ticket?.jogId ?? draft?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
+  const [epicId, setEpicId] = useState<string | null>(ticket?.epicId ?? draft?.epicId ?? null);
+  const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? draft?.priority ?? null);
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
-  const [dueDate, setDueDate] = useState(ticket?.dueDate ?? '');
-  const [tags, setTags] = useState<string[]>(ticket?.tags ?? []);
+  const [dueDate, setDueDate] = useState(ticket?.dueDate ?? draft?.dueDate ?? '');
+  const [tags, setTags] = useState<string[]>(ticket?.tags ?? draft?.tags ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setDraft<NewTicketDraft>(NEW_TICKET_DRAFT_KEY, {
+      title,
+      body,
+      acceptanceCriteria,
+      jogId,
+      epicId,
+      priority,
+      dueDate,
+      tags,
+    });
+  }, [isEditing, title, body, acceptanceCriteria, jogId, epicId, priority, dueDate, tags]);
+
+  function handleCancel() {
+    clearDraft(NEW_TICKET_DRAFT_KEY);
+    onClose();
+  }
 
   const [comments, setComments] = useState<Comment[]>(ticket?.comments ?? []);
   const [newComment, setNewComment] = useState('');
@@ -79,6 +115,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
         ? { ...(ticket as Ticket), ...payload, comments, updatedAt: new Date().toISOString() }
         : await response.json();
 
+      if (!isEditing) clearDraft(NEW_TICKET_DRAFT_KEY);
       onSaved(saved);
       onClose();
     } catch {
@@ -318,7 +355,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleCancel}
                 className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 Cancel

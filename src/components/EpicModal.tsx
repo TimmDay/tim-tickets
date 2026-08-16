@@ -1,9 +1,10 @@
 'use client';
 
-import { SubmitEvent, useState } from 'react';
+import { SubmitEvent, useEffect, useState } from 'react';
 import { EpicColorThemeSelect } from './EpicColorThemeSelect';
 import { useEpics } from '@/lib/EpicsContext';
-import { DEFAULT_EPIC_COLOR_THEME, Epic } from '@/lib/types';
+import { clearDraft, getDraft, setDraft } from '@/lib/formDrafts';
+import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme } from '@/lib/types';
 
 interface EpicModalProps {
   epic?: Epic | null;
@@ -11,14 +12,33 @@ interface EpicModalProps {
   onSaved: (epicId: string) => void;
 }
 
+const NEW_EPIC_DRAFT_KEY = 'epic:new';
+
+interface NewEpicDraft {
+  name: string;
+  description: string;
+  colorTheme: EpicColorTheme;
+}
+
 export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
   const { createEpic, updateEpic } = useEpics();
   const isEditing = Boolean(epic);
+  const draft = isEditing ? undefined : getDraft<NewEpicDraft>(NEW_EPIC_DRAFT_KEY);
 
-  const [name, setName] = useState(epic?.name ?? '');
-  const [description, setDescription] = useState(epic?.description ?? '');
-  const [colorTheme, setColorTheme] = useState(epic?.colorTheme ?? DEFAULT_EPIC_COLOR_THEME);
+  const [name, setName] = useState(epic?.name ?? draft?.name ?? '');
+  const [description, setDescription] = useState(epic?.description ?? draft?.description ?? '');
+  const [colorTheme, setColorTheme] = useState(epic?.colorTheme ?? draft?.colorTheme ?? DEFAULT_EPIC_COLOR_THEME);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setDraft<NewEpicDraft>(NEW_EPIC_DRAFT_KEY, { name, description, colorTheme });
+  }, [isEditing, name, description, colorTheme]);
+
+  function handleCancel() {
+    clearDraft(NEW_EPIC_DRAFT_KEY);
+    onClose();
+  }
 
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -30,6 +50,7 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
         onSaved(epic!.id);
       } else {
         const created = await createEpic(name.trim(), description, colorTheme);
+        clearDraft(NEW_EPIC_DRAFT_KEY);
         onSaved(created.id);
       }
       onClose();
@@ -78,7 +99,7 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCancel}
               className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               Cancel

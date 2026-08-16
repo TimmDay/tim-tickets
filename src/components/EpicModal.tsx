@@ -3,8 +3,8 @@
 import { SubmitEvent, useEffect, useState } from 'react';
 import { EpicColorThemeSelect } from './EpicColorThemeSelect';
 import { useEpics } from '@/lib/EpicsContext';
-import { clearDraft, getDraft, setDraft } from '@/lib/formDrafts';
-import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme } from '@/lib/types';
+import { useNewEpicDraft } from '@/lib/formDrafts';
+import { DEFAULT_EPIC_COLOR_THEME, Epic } from '@/lib/types';
 
 interface EpicModalProps {
   epic?: Epic | null;
@@ -12,18 +12,11 @@ interface EpicModalProps {
   onSaved: (epicId: string) => void;
 }
 
-const NEW_EPIC_DRAFT_KEY = 'epic:new';
-
-interface NewEpicDraft {
-  name: string;
-  description: string;
-  colorTheme: EpicColorTheme;
-}
-
 export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
   const { createEpic, updateEpic } = useEpics();
   const isEditing = Boolean(epic);
-  const draft = isEditing ? undefined : getDraft<NewEpicDraft>(NEW_EPIC_DRAFT_KEY);
+  const { getDraft, setDraft, clearDraft } = useNewEpicDraft();
+  const draft = isEditing ? null : getDraft();
 
   const [name, setName] = useState(epic?.name ?? draft?.name ?? '');
   const [description, setDescription] = useState(epic?.description ?? draft?.description ?? '');
@@ -32,11 +25,11 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
 
   useEffect(() => {
     if (isEditing) return;
-    setDraft<NewEpicDraft>(NEW_EPIC_DRAFT_KEY, { name, description, colorTheme });
-  }, [isEditing, name, description, colorTheme]);
+    setDraft({ name, description, colorTheme });
+  }, [isEditing, name, description, colorTheme, setDraft]);
 
   function handleCancel() {
-    clearDraft(NEW_EPIC_DRAFT_KEY);
+    clearDraft();
     onClose();
   }
 
@@ -50,7 +43,7 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
         onSaved(epic!.id);
       } else {
         const created = await createEpic(name.trim(), description, colorTheme);
-        clearDraft(NEW_EPIC_DRAFT_KEY);
+        clearDraft();
         onSaved(created.id);
       }
       onClose();

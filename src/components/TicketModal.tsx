@@ -9,7 +9,7 @@ import { JogSelect } from './JogSelect';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
-import { clearDraft, getDraft, setDraft } from '@/lib/formDrafts';
+import { useNewTicketDraft } from '@/lib/formDrafts';
 import { BASE_TAGS, Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 interface TicketModalProps {
@@ -20,25 +20,13 @@ interface TicketModalProps {
   onDeleted?: (ticketId: string) => void;
 }
 
-const NEW_TICKET_DRAFT_KEY = 'ticket:new';
-
-interface NewTicketDraft {
-  title: string;
-  body: string;
-  acceptanceCriteria: string;
-  jogId: string;
-  epicId: string | null;
-  priority: Priority | null;
-  dueDate: string;
-  tags: string[];
-}
-
 export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted }: TicketModalProps) {
   const { jogs } = useJogs();
   const isEditing = Boolean(ticket);
+  const { getDraft, setDraft, clearDraft } = useNewTicketDraft();
   // Draft persistence only applies to new-ticket creation, not in-progress edits to an
   // existing ticket, so this is only ever read when !isEditing.
-  const draft = isEditing ? undefined : getDraft<NewTicketDraft>(NEW_TICKET_DRAFT_KEY);
+  const draft = isEditing ? null : getDraft();
 
   const [title, setTitle] = useState(ticket?.title ?? draft?.title ?? '');
   const [body, setBody] = useState(ticket?.body ?? draft?.body ?? '');
@@ -55,20 +43,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
 
   useEffect(() => {
     if (isEditing) return;
-    setDraft<NewTicketDraft>(NEW_TICKET_DRAFT_KEY, {
-      title,
-      body,
-      acceptanceCriteria,
-      jogId,
-      epicId,
-      priority,
-      dueDate,
-      tags,
-    });
-  }, [isEditing, title, body, acceptanceCriteria, jogId, epicId, priority, dueDate, tags]);
+    setDraft({ title, body, acceptanceCriteria, jogId, epicId, priority, dueDate, tags });
+  }, [isEditing, title, body, acceptanceCriteria, jogId, epicId, priority, dueDate, tags, setDraft]);
 
   function handleCancel() {
-    clearDraft(NEW_TICKET_DRAFT_KEY);
+    clearDraft();
     onClose();
   }
 
@@ -115,7 +94,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
         ? { ...(ticket as Ticket), ...payload, comments, updatedAt: new Date().toISOString() }
         : await response.json();
 
-      if (!isEditing) clearDraft(NEW_TICKET_DRAFT_KEY);
+      if (!isEditing) clearDraft();
       onSaved(saved);
       onClose();
     } catch {

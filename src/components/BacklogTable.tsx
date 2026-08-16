@@ -153,12 +153,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
     const newOrder = computeOrderBetween(before, after);
 
     if (needsRebalance(before, after, newOrder)) {
-      const rebalanced = moved.map((ticket, index) => ({ ...ticket, order: index * ORDER_GAP }));
-      setTickets(rebalanced);
+      // `moved` is derived from visibleTickets, which excludes archived tickets — update order
+      // in place rather than replacing `tickets` wholesale, or archived tickets would be dropped
+      // from local state until the next reload.
+      const orderById = new Map(moved.map((ticket, index) => [ticket.id, index * ORDER_GAP]));
+      setTickets((prev) => prev.map((t) => (orderById.has(t.id) ? { ...t, order: orderById.get(t.id)! } : t)));
       await fetch('/api/tickets/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: rebalanced.map((t) => t.id) }),
+        body: JSON.stringify({ order: moved.map((t) => t.id) }),
       });
       return;
     }

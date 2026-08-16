@@ -1,6 +1,10 @@
 export const SESSION_COOKIE_NAME = 'tt_session';
 
 const SESSION_PAYLOAD = 'authenticated';
+// Matches the cookie's own maxAge (see login route) — enforced server-side too, since a
+// copied/leaked cookie value would otherwise remain a valid credential forever (the token
+// itself carried no expiry, only the browser's respect for the cookie's maxAge did).
+const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -32,13 +36,20 @@ function requireSessionSecret(): string {
 }
 
 export async function createSessionToken(): Promise<string> {
-  return hmac(requireSessionSecret(), SESSION_PAYLOAD);
+  const issuedAt = Date.now().toString();
+  const signature = await hmac(requireSessionSecret(), `${SESSION_PAYLOAD}.${issuedAt}`);
+  return `${issuedAt}.${signature}`;
 }
 
 export async function isValidSessionToken(token: string | undefined): Promise<boolean> {
   if (!token) return false;
-  const expected = await createSessionToken();
-  return timingSafeEqual(token, expected);
+
+  const [issuedAt, signature] = token.split('.');
+  if (!issuedAt || !signature || !/^\d+$/.test(issuedAt)) return false;
+  if (Date.now() - Number(issuedAt) > SESSION_MAX_AGE_MS) return false;
+
+  const expectedSignature = await hmac(requireSessionSecret(), `${SESSION_PAYLOAD}.${issuedAt}`);
+  return timingSafeEqual(signature, expectedSignature);
 }
 
 export function checkPassword(password: string): boolean {

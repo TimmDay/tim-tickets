@@ -1,4 +1,4 @@
-import { FieldValue, Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
+import { FieldValue, Firestore, QueryDocumentSnapshot, WriteBatch } from '@google-cloud/firestore';
 import {
   Comment,
   DEFAULT_EPIC_COLOR_THEME,
@@ -35,6 +35,19 @@ function getFirestore(): Firestore {
 const ticketsCollection = () => getFirestore().collection('tickets');
 const jogsCollection = () => getFirestore().collection('jogs');
 const epicsCollection = () => getFirestore().collection('epics');
+
+// Firestore hard-caps a single WriteBatch at 500 mutations. Cascade operations (archiving a
+// jog/epic, bulk reorders) can exceed that over time as data accumulates, so mutations are
+// queued up front and committed across as many batches as needed.
+const FIRESTORE_BATCH_LIMIT = 500;
+
+async function commitInChunks(mutations: ((batch: WriteBatch) => void)[]): Promise<void> {
+  for (let i = 0; i < mutations.length; i += FIRESTORE_BATCH_LIMIT) {
+    const batch = getFirestore().batch();
+    mutations.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((mutate) => mutate(batch));
+    await batch.commit();
+  }
+}
 
 function toJog(doc: QueryDocumentSnapshot): Jog {
   const data = doc.data();
@@ -122,11 +135,9 @@ export async function createJog(
 /** Rebalances the given jogs to evenly-spaced order values. Only needed when
  * fractional-index gaps between neighbors have collapsed too far to bisect. */
 export async function reorderJogs(orderedIds: string[]): Promise<void> {
-  const batch = getFirestore().batch();
-  orderedIds.forEach((id, index) => {
-    batch.update(jogsCollection().doc(id), { order: index * ORDER_GAP });
-  });
-  await batch.commit();
+  await commitInChunks(
+    orderedIds.map((id, index) => (batch) => batch.update(jogsCollection().doc(id), { order: index * ORDER_GAP })),
+  );
 }
 
 export interface UpdateJogInput {
@@ -148,13 +159,12 @@ export async function deleteJog(id: string): Promise<void> {
   }
 
   const orphaned = await ticketsCollection().where('jogId', '==', id).get();
-  const batch = getFirestore().batch();
   const now = new Date().toISOString();
-  orphaned.docs.forEach((doc) => {
-    batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now });
-  });
-  batch.delete(jogsCollection().doc(id));
-  await batch.commit();
+  const mutations: ((batch: WriteBatch) => void)[] = orphaned.docs.map(
+    (doc) => (batch) => batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now }),
+  );
+  mutations.push((batch) => batch.delete(jogsCollection().doc(id)));
+  await commitInChunks(mutations);
 }
 
 /** Archives a jog: tickets currently in the "done" column are archived along with it,
@@ -166,20 +176,19 @@ export async function completeJog(id: string): Promise<void> {
   }
 
   const jogTickets = await ticketsCollection().where('jogId', '==', id).get();
-  const batch = getFirestore().batch();
   const now = new Date().toISOString();
 
-  batch.update(jogsCollection().doc(id), { isArchived: true });
+  const mutations: ((batch: WriteBatch) => void)[] = [(batch) => batch.update(jogsCollection().doc(id), { isArchived: true })];
 
   jogTickets.docs.forEach((doc) => {
     if (doc.data().status === 'done') {
-      batch.update(doc.ref, { isArchived: true, updatedAt: now });
+      mutations.push((batch) => batch.update(doc.ref, { isArchived: true, updatedAt: now }));
     } else {
-      batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now });
+      mutations.push((batch) => batch.update(doc.ref, { jogId: defaultJog.id, updatedAt: now }));
     }
   });
 
-  await batch.commit();
+  await commitInChunks(mutations);
 }
 
 export async function getEpics(): Promise<Epic[]> {
@@ -218,28 +227,28 @@ export async function updateEpic(id: string, input: UpdateEpicInput): Promise<vo
 
 export async function deleteEpic(id: string): Promise<void> {
   const memberTickets = await ticketsCollection().where('epicId', '==', id).get();
-  const batch = getFirestore().batch();
   const now = new Date().toISOString();
-  memberTickets.docs.forEach((doc) => {
-    batch.update(doc.ref, { epicId: null, updatedAt: now });
-  });
-  batch.delete(epicsCollection().doc(id));
-  await batch.commit();
+  const mutations: ((batch: WriteBatch) => void)[] = memberTickets.docs.map(
+    (doc) => (batch) => batch.update(doc.ref, { epicId: null, updatedAt: now }),
+  );
+  mutations.push((batch) => batch.delete(epicsCollection().doc(id)));
+  await commitInChunks(mutations);
 }
 
 /** Archives an epic and every ticket assigned to it, regardless of status. */
 export async function archiveEpic(id: string): Promise<void> {
   const memberTickets = await ticketsCollection().where('epicId', '==', id).get();
-  const batch = getFirestore().batch();
   const now = new Date().toISOString();
 
-  batch.update(epicsCollection().doc(id), { isArchived: true, completedAt: now });
+  const mutations: ((batch: WriteBatch) => void)[] = [
+    (batch) => batch.update(epicsCollection().doc(id), { isArchived: true, completedAt: now }),
+  ];
 
   memberTickets.docs.forEach((doc) => {
-    batch.update(doc.ref, { isArchived: true, updatedAt: now });
+    mutations.push((batch) => batch.update(doc.ref, { isArchived: true, updatedAt: now }));
   });
 
-  await batch.commit();
+  await commitInChunks(mutations);
 }
 
 export async function getTickets(): Promise<Ticket[]> {
@@ -283,12 +292,12 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
 /** Rebalances the given tickets to evenly-spaced order values. Only needed when
  * fractional-index gaps between neighbors have collapsed too far to bisect. */
 export async function reorderTickets(orderedIds: string[]): Promise<void> {
-  const batch = getFirestore().batch();
   const now = new Date().toISOString();
-  orderedIds.forEach((id, index) => {
-    batch.update(ticketsCollection().doc(id), { order: index * ORDER_GAP, updatedAt: now });
-  });
-  await batch.commit();
+  await commitInChunks(
+    orderedIds.map(
+      (id, index) => (batch) => batch.update(ticketsCollection().doc(id), { order: index * ORDER_GAP, updatedAt: now }),
+    ),
+  );
 }
 
 export interface UpdateTicketInput {

@@ -77,9 +77,12 @@ export function JogsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const reorderJogs = useCallback(async (orderedIds: string[]) => {
+    // orderedIds is only the currently-visible (filtered) subset, not the full jogs list —
+    // update order in place rather than replacing `jogs` wholesale, or any archived/filtered-out
+    // jog would be dropped from context state until the next full refresh().
     setJogs((prev) => {
-      const byId = new Map(prev.map((jog) => [jog.id, jog]));
-      return orderedIds.map((id, index) => ({ ...byId.get(id)!, order: index * ORDER_GAP }));
+      const orderById = new Map(orderedIds.map((id, index) => [id, index * ORDER_GAP]));
+      return prev.map((jog) => (orderById.has(jog.id) ? { ...jog, order: orderById.get(jog.id)! } : jog));
     });
     await fetch('/api/jogs/reorder', {
       method: 'POST',

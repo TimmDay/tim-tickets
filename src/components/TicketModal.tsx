@@ -9,6 +9,7 @@ import { JogSelect } from './JogSelect';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
+import { useNewTicketDraft } from '@/lib/formDrafts';
 import { BASE_TAGS, Comment, PRIORITIES, Priority, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 interface TicketModalProps {
@@ -22,19 +23,33 @@ interface TicketModalProps {
 export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted }: TicketModalProps) {
   const { jogs } = useJogs();
   const isEditing = Boolean(ticket);
+  const { getDraft, setDraft, clearDraft } = useNewTicketDraft();
+  // Draft persistence only applies to new-ticket creation, not in-progress edits to an
+  // existing ticket, so this is only ever read when !isEditing.
+  const draft = isEditing ? null : getDraft();
 
-  const [title, setTitle] = useState(ticket?.title ?? '');
-  const [body, setBody] = useState(ticket?.body ?? '');
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState(ticket?.acceptanceCriteria ?? '');
+  const [title, setTitle] = useState(ticket?.title ?? draft?.title ?? '');
+  const [body, setBody] = useState(ticket?.body ?? draft?.body ?? '');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState(ticket?.acceptanceCriteria ?? draft?.acceptanceCriteria ?? '');
   const acceptanceCriteriaRef = useRef<HTMLTextAreaElement>(null);
-  const [jogId, setJogId] = useState(ticket?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
-  const [epicId, setEpicId] = useState<string | null>(ticket?.epicId ?? null);
-  const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? null);
+  const [jogId, setJogId] = useState(ticket?.jogId ?? draft?.jogId ?? defaultJogId ?? jogs[0]?.id ?? '');
+  const [epicId, setEpicId] = useState<string | null>(ticket?.epicId ?? draft?.epicId ?? null);
+  const [priority, setPriority] = useState<Priority | null>(ticket?.priority ?? draft?.priority ?? null);
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
-  const [dueDate, setDueDate] = useState(ticket?.dueDate ?? '');
-  const [tags, setTags] = useState<string[]>(ticket?.tags ?? []);
+  const [dueDate, setDueDate] = useState(ticket?.dueDate ?? draft?.dueDate ?? '');
+  const [tags, setTags] = useState<string[]>(ticket?.tags ?? draft?.tags ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setDraft({ title, body, acceptanceCriteria, jogId, epicId, priority, dueDate, tags });
+  }, [isEditing, title, body, acceptanceCriteria, jogId, epicId, priority, dueDate, tags, setDraft]);
+
+  function handleCancel() {
+    clearDraft();
+    onClose();
+  }
 
   const [comments, setComments] = useState<Comment[]>(ticket?.comments ?? []);
   const [newComment, setNewComment] = useState('');
@@ -79,6 +94,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
         ? { ...(ticket as Ticket), ...payload, comments, updatedAt: new Date().toISOString() }
         : await response.json();
 
+      if (!isEditing) clearDraft();
       onSaved(saved);
       onClose();
     } catch {
@@ -151,9 +167,17 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 sm:p-4" onClick={onClose}>
       <div
-        className="h-dvh w-full overflow-y-auto bg-white px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg sm:pb-6 dark:bg-gray-900"
+        className="relative h-dvh w-full overflow-y-auto bg-white px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg sm:pb-6 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        >
+          <XIcon className="h-5 w-5" />
+        </button>
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
           {isEditing ? 'Edit ticket' : 'New ticket'}
         </h2>
@@ -318,7 +342,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleCancel}
                 className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 Cancel

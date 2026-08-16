@@ -1,7 +1,9 @@
 'use client';
 
-import { SubmitEvent, useState } from 'react';
+import { SubmitEvent, useEffect, useState } from 'react';
+import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
+import { useNewJogDraft } from '@/lib/formDrafts';
 import { Jog } from '@/lib/types';
 
 interface JogModalProps {
@@ -13,11 +15,23 @@ interface JogModalProps {
 export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
   const { createJog, updateJog } = useJogs();
   const isEditing = Boolean(jog);
+  const { getDraft, setDraft, clearDraft } = useNewJogDraft();
+  const draft = isEditing ? null : getDraft();
 
-  const [name, setName] = useState(jog?.name ?? '');
-  const [startDate, setStartDate] = useState(jog?.startDate ?? '');
-  const [endDate, setEndDate] = useState(jog?.endDate ?? '');
+  const [name, setName] = useState(jog?.name ?? draft?.name ?? '');
+  const [startDate, setStartDate] = useState(jog?.startDate ?? draft?.startDate ?? '');
+  const [endDate, setEndDate] = useState(jog?.endDate ?? draft?.endDate ?? '');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setDraft({ name, startDate, endDate });
+  }, [isEditing, name, startDate, endDate, setDraft]);
+
+  function handleCancel() {
+    clearDraft();
+    onClose();
+  }
 
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -29,6 +43,7 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
         onSaved(jog!.id);
       } else {
         const created = await createJog(name.trim(), startDate || null, endDate || null);
+        clearDraft();
         onSaved(created.id);
       }
       onClose();
@@ -40,9 +55,17 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
+        className="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        >
+          <XIcon className="h-5 w-5" />
+        </button>
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
           {isEditing ? 'Edit jog' : 'New jog'}
         </h2>
@@ -82,7 +105,7 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCancel}
               className="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               Cancel

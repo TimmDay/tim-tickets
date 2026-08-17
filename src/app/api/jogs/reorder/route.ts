@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { reorderJogs } from '@/lib/firestore';
+import { jogsRepo } from '@/lib/repos';
 
 const reorderSchema = z.object({
   order: z.array(z.string().min(1)).min(1),
@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  await reorderJogs(parsed.data.order);
+  await jogsRepo.reorderJogs(parsed.data.order);
   return NextResponse.json({ ok: true });
 }

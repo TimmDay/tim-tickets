@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { addComment } from '@/lib/firestore';
+import { ticketsRepo } from '@/lib/repos';
 
 const addCommentSchema = z.object({
   body: z.string().trim().min(1),
@@ -14,6 +14,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const comment = await addComment(id, parsed.data.body);
+  const comment = await ticketsRepo.addComment(id, parsed.data.body);
   return NextResponse.json(comment, { status: 201 });
 }

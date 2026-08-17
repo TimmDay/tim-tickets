@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createJog, getJogs } from '@/lib/firestore';
+import { jogsRepo } from '@/lib/repos';
 
 const createJogSchema = z.object({
   name: z.string().trim().min(1),
@@ -9,7 +9,7 @@ const createJogSchema = z.object({
 });
 
 export async function GET() {
-  const jogs = await getJogs();
+  const jogs = await jogsRepo.getJogs();
   return NextResponse.json(jogs);
 }
 
@@ -20,6 +20,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const jog = await createJog(parsed.data.name, parsed.data.startDate ?? null, parsed.data.endDate ?? null);
+  const jog = await jogsRepo.createJog(parsed.data.name, parsed.data.startDate ?? null, parsed.data.endDate ?? null);
   return NextResponse.json(jog, { status: 201 });
 }

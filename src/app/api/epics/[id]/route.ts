@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { deleteEpic, updateEpic } from '@/lib/firestore';
+import { epicsRepo } from '@/lib/repos';
 import { EPIC_COLOR_THEME_VALUES } from '@/lib/types';
 
 const updateEpicSchema = z.object({
@@ -17,12 +17,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  await updateEpic(id, parsed.data);
+  await epicsRepo.updateEpic(id, parsed.data);
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await deleteEpic(id);
+  await epicsRepo.deleteEpic(id);
   return NextResponse.json({ ok: true });
 }

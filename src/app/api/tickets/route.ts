@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createTicket, getTickets } from '@/lib/firestore';
+import { ticketsRepo } from '@/lib/repos';
 
 const createTicketSchema = z.object({
   title: z.string().trim().min(1),
@@ -13,7 +13,7 @@ const createTicketSchema = z.object({
 });
 
 export async function GET() {
-  const tickets = await getTickets();
+  const tickets = await ticketsRepo.getTickets();
   return NextResponse.json(tickets);
 }
 
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const ticket = await createTicket(parsed.data);
+  const ticket = await ticketsRepo.createTicket(parsed.data);
   return NextResponse.json(ticket, { status: 201 });
 }

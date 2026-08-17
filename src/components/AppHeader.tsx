@@ -18,11 +18,6 @@ export function AppHeader() {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
 
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-  }
-
   return (
     <header className="shrink-0 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-3">
@@ -52,14 +47,6 @@ export function AppHeader() {
             <span className="hidden sm:inline">+ Add</span>
           </button>
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 sm:px-3 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            <span className="sm:hidden">Out</span>
-            <span className="hidden sm:inline">Log out</span>
-          </button>
         </div>
       </div>
 

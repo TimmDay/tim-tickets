@@ -35,6 +35,24 @@ function getFirestore(): Firestore {
 const ticketsCollection = () => getFirestore().collection('tickets');
 const jogsCollection = () => getFirestore().collection('jogs');
 const epicsCollection = () => getFirestore().collection('epics');
+const countersCollection = () => getFirestore().collection('counters');
+
+const TICKET_KEY_COUNTER_ID = 'tickets';
+
+/** Atomically reserves `count` consecutive ticket-key numbers (e.g. requesting 3 when the
+ * counter is at 5 reserves 6, 7, 8) via a transaction on a single counter doc, so concurrent
+ * ticket creations — or a bulk backfill running alongside one — can never hand out the same
+ * key twice. */
+async function reserveTicketKeyNumbers(count: number): Promise<number[]> {
+  if (count === 0) return [];
+  const ref = countersCollection().doc(TICKET_KEY_COUNTER_ID);
+  return getFirestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current: number = snap.exists ? (snap.data()!.value ?? 0) : 0;
+    tx.set(ref, { value: current + count }, { merge: true });
+    return Array.from({ length: count }, (_, i) => current + i + 1);
+  });
+}
 
 // Firestore hard-caps a single WriteBatch at 500 mutations. Cascade operations (archiving a
 // jog/epic, bulk reorders) can exceed that over time as data accumulates, so mutations are
@@ -80,6 +98,7 @@ function toTicket(doc: QueryDocumentSnapshot): Ticket {
   const data = doc.data();
   return {
     id: doc.id,
+    key: data.key ?? '',
     title: data.title,
     body: data.body,
     acceptanceCriteria: data.acceptanceCriteria ?? '',
@@ -253,7 +272,30 @@ export async function archiveEpic(id: string): Promise<void> {
 
 export async function getTickets(): Promise<Ticket[]> {
   const snapshot = await ticketsCollection().orderBy('createdAt', 'asc').get();
-  return snapshot.docs.map(toTicket);
+
+  // One-off backfill for tickets created before the `key` field existed — same lazy,
+  // self-healing pattern as ensureDefaultJog. Only ever touches docs that don't have a key
+  // yet, so it's a no-op once every ticket has been backfilled.
+  const missingKeyDocs = snapshot.docs.filter((doc) => !doc.data().key);
+  const backfilledKeys = new Map<string, string>();
+  if (missingKeyDocs.length > 0) {
+    const numbers = await reserveTicketKeyNumbers(missingKeyDocs.length);
+    missingKeyDocs.forEach((doc, i) => backfilledKeys.set(doc.id, `T-${numbers[i]}`));
+    await commitInChunks(
+      missingKeyDocs.map((doc) => (batch) => batch.update(doc.ref, { key: backfilledKeys.get(doc.id) })),
+    );
+  }
+
+  return snapshot.docs.map((doc) => {
+    const ticket = toTicket(doc);
+    const backfilledKey = backfilledKeys.get(doc.id);
+    return backfilledKey ? { ...ticket, key: backfilledKey } : ticket;
+  });
+}
+
+export async function getTicketByKey(key: string): Promise<Ticket | null> {
+  const snapshot = await ticketsCollection().where('key', '==', key).limit(1).get();
+  return snapshot.empty ? null : toTicket(snapshot.docs[0]);
 }
 
 export interface CreateTicketInput {
@@ -269,7 +311,9 @@ export interface CreateTicketInput {
 
 export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
   const now = new Date().toISOString();
+  const [keyNumber] = await reserveTicketKeyNumbers(1);
   const data = {
+    key: `T-${keyNumber}`,
     title: input.title,
     body: input.body,
     acceptanceCriteria: input.acceptanceCriteria,

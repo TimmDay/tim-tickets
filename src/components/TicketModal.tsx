@@ -6,6 +6,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { EpicSelect } from './EpicSelect';
 import { InfoIcon } from './InfoIcon';
 import { JogSelect } from './JogSelect';
+import { LinkIcon } from './LinkIcon';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
@@ -40,6 +41,14 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [tags, setTags] = useState<string[]>(ticket?.tags ?? draft?.tags ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  function handleCopyLink() {
+    if (!ticket) return;
+    navigator.clipboard.writeText(`${window.location.origin}/tickets/${ticket.key}`);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  }
 
   useEffect(() => {
     if (isEditing) return;
@@ -178,9 +187,22 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {isEditing ? 'Edit ticket' : 'New ticket'}
-        </h2>
+        <div className="mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {isEditing ? 'Edit ticket' : 'New ticket'}
+          </h2>
+          {isEditing && ticket?.key && (
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              title="Copy shareable link"
+              className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              <LinkIcon className="h-3 w-3" />
+              {linkCopied ? 'Copied!' : ticket.key}
+            </button>
+          )}
+        </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           {isEditing && (
             <div className="lg:hidden">

@@ -61,9 +61,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   // Reordering assumes visibleTickets is exactly the full underlying list (just re-sorted),
   // so it can safely be disabled whenever any filter — including "hide archived", which is
-  // the default — narrows what's shown.
+  // the default — narrows what's shown. The backlog (default) jog is the one exception:
+  // it's the landing view (see the default-jog-filter effect above), so it stays reorderable
+  // even though it's technically a filter — every other jog and "All tickets" behave as before.
   const canReorder =
-    sortKey === 'manual' && !search.trim() && jogFilter === 'all' && epicFilter === 'all' && !showArchived;
+    sortKey === 'manual' &&
+    !search.trim() &&
+    (jogFilter === 'all' || jogFilter === defaultJogId) &&
+    epicFilter === 'all' &&
+    !showArchived;
 
   function toggleSort(key: Exclude<SortKey, 'manual'>) {
     if (sortKey === key) {
@@ -209,12 +215,12 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
             onChange={(event) => setJogFilter(event.target.value)}
             className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
-            <option value="all">All jogs</option>
             {visibleJogs.map((jog) => (
               <option key={jog.id} value={jog.id}>
                 {jog.name}
               </option>
             ))}
+            <option value="all">All tickets</option>
           </select>
           <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         </div>

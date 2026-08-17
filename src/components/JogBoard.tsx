@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
@@ -143,14 +144,20 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     // The target column's own tickets (unfiltered by search/jog/epic — a drag always
     // reasons about the full column, same as before) are the list `computeReorder` needs;
     // status is its own concern, so the moved ticket is spliced in with it already applied.
-    const columnTickets = tickets.filter((t) => t.status === targetStatus && t.id !== activeId).sort((a, b) => a.order - b.order);
-    const insertIndex = overIsColumn ? columnTickets.length : columnTickets.findIndex((t) => t.id === overId);
+    // For a same-column drag the moved ticket keeps its place in the list (so arrayMove sees
+    // its real oldIndex and shifts direction correctly); for a cross-column drag it has no
+    // place yet, so it's appended before arrayMove relocates it.
     const movedTicket: Ticket = { ...activeTicket, status: targetStatus };
-    const orderedList = [
-      ...columnTickets.slice(0, insertIndex === -1 ? columnTickets.length : insertIndex),
-      movedTicket,
-      ...columnTickets.slice(insertIndex === -1 ? columnTickets.length : insertIndex),
-    ];
+    const baseColumnTickets = tickets
+      .filter((t) => t.status === targetStatus)
+      .sort((a, b) => a.order - b.order)
+      .map((t) => (t.id === activeId ? movedTicket : t));
+    const columnTickets = statusChanged ? [...baseColumnTickets, movedTicket] : baseColumnTickets;
+
+    const oldIndex = columnTickets.findIndex((t) => t.id === activeId);
+    const overIndex = overIsColumn ? columnTickets.length - 1 : columnTickets.findIndex((t) => t.id === overId);
+    const newIndex = overIndex === -1 ? columnTickets.length - 1 : overIndex;
+    const orderedList = arrayMove(columnTickets, oldIndex, newIndex);
 
     const { orderUpdates, persist } = computeReorder(orderedList, activeId);
 

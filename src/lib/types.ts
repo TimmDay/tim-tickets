@@ -10,6 +10,11 @@ export interface Comment {
 
 export interface Ticket {
   id: string;
+  /** Short, human-readable, immutable identifier (e.g. "T-42") used for shareable URLs
+   * (`/tickets/T-42`) — separate from `id` (the Firestore doc id) so links stay stable
+   * even if the underlying storage ever changes. Assigned once at creation and never
+   * reused or reassigned. */
+  key: string;
   title: string;
   body: string;
   acceptanceCriteria: string;

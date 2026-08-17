@@ -285,16 +285,6 @@ export async function getTickets(): Promise<Ticket[]> {
     );
   }
 
-  // One-off cleanup for the retired acceptanceCriteria field — strips it from any ticket
-  // that still has it from before the field was removed. Same self-healing shape as the key
-  // backfill above; a no-op once every ticket has been cleaned up.
-  const staleAcceptanceCriteriaDocs = snapshot.docs.filter((doc) => doc.data().acceptanceCriteria !== undefined);
-  if (staleAcceptanceCriteriaDocs.length > 0) {
-    await commitInChunks(
-      staleAcceptanceCriteriaDocs.map((doc) => (batch) => batch.update(doc.ref, { acceptanceCriteria: FieldValue.delete() })),
-    );
-  }
-
   return snapshot.docs.map((doc) => {
     const ticket = toTicket(doc);
     const backfilledKey = backfilledKeys.get(doc.id);

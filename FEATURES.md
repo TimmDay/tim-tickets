@@ -47,7 +47,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ### Global "+ Add" button
 - Lives in the header, visible on all pages.
 - Opens a ticket-creation modal, reused for editing existing tickets.
-- Fields: title, body, acceptance criteria (optional, one testable line per bullet), jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date.
+- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date.
 - Clicking outside the modal (the backdrop) closes it, same as Cancel.
 
 ### Comments
@@ -72,7 +72,6 @@ interface Ticket {
   id: string;
   title: string;
   body: string;
-  acceptanceCriteria: string; // optional; one testable bullet per line
   status: TicketStatus;
   jogId: string;           // always set, never null
   epicId: string | null;   // optional; a ticket belongs to at most one epic

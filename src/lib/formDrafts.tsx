@@ -50,7 +50,6 @@ function createDraftStore<T>() {
 export interface NewTicketDraft {
   title: string;
   body: string;
-  acceptanceCriteria: string;
   jogId: string;
   epicId: string | null;
   priority: Priority | null;

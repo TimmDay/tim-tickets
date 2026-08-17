@@ -17,7 +17,6 @@ export interface Ticket {
   key: string;
   title: string;
   body: string;
-  acceptanceCriteria: string;
   status: TicketStatus;
   jogId: string;
   epicId: string | null;

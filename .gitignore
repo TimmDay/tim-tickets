@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# playwright mcp snapshots
+.playwright-mcp/
+
 # GCP service account keys
 .secrets/
 

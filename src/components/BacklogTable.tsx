@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -22,7 +22,7 @@ type SortKey = 'manual' | 'title' | 'jog' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
 
 export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
-  const { jogs } = useJogs();
+  const { jogs, defaultJogId } = useJogs();
   const { epics } = useEpics();
   const [tickets, setTickets] = useState(initialTickets);
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
@@ -34,6 +34,16 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   const [search, setSearch] = useState('');
   const [jogFilter, setJogFilter] = useState('all');
+  const hasAppliedDefaultJogFilter = useRef(false);
+
+  // `jogs` is fetched client-side (see JogsContext) so `defaultJogId` isn't known on the
+  // first render or two — apply it once it becomes available, but only ever once, so it
+  // doesn't clobber a filter the user has since changed.
+  useEffect(() => {
+    if (hasAppliedDefaultJogFilter.current || !defaultJogId) return;
+    hasAppliedDefaultJogFilter.current = true;
+    setJogFilter(defaultJogId);
+  }, [defaultJogId]);
   const [epicFilter, setEpicFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');

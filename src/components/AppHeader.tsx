@@ -41,7 +41,7 @@ export function AppHeader() {
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="rounded-md bg-gray-900 px-2 py-1.5 text-sm font-medium text-white hover:bg-gray-800 sm:px-3 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-900 text-sm font-medium text-white hover:bg-gray-800 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
           >
             <span className="sm:hidden">+</span>
             <span className="hidden sm:inline">+ Add</span>

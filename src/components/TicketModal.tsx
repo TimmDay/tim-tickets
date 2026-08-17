@@ -207,19 +207,30 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           {isEditing && (
             <div className="lg:hidden">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-              <div className="relative">
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as TicketStatus)}
-                  className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <select
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value as TicketStatus)}
+                    className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  >
+                    {STATUSES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
+                {/* Same-line save so a quick status change (the most common edit) doesn't
+                    require scrolling all the way down to the form's main Save button. */}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="shrink-0 rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
                 >
-                  {STATUSES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </div>
           )}

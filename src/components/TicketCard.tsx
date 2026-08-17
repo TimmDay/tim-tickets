@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -51,6 +51,20 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
     cancelHide();
     hideTimeoutRef.current = setTimeout(() => setPopoverPosition(null), 100);
   }
+
+  useEffect(() => {
+    if (!popoverPosition) return;
+    // The popover is `position: fixed` at coordinates captured when it opened, so it doesn't
+    // track the icon as the page scrolls — on mobile in particular (where it's opened via
+    // tap-simulated hover, which lingers), that leaves it visually detached from its trigger.
+    // Close it on any scroll rather than trying to keep it pinned in place.
+    function handleScroll() {
+      cancelHide();
+      setPopoverPosition(null);
+    }
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
+  }, [popoverPosition]);
 
   return (
     <div

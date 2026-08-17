@@ -6,7 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useJogs } from '@/lib/JogsContext';
-import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { computeReorder } from '@/lib/ordering';
 import { ConfirmModal } from './ConfirmModal';
 import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
@@ -47,17 +47,13 @@ export function JogsList({ ticketCounts }: JogsListProps) {
     if (oldIndex === -1 || newIndex === -1) return;
 
     const moved = arrayMove(displayedJogs, oldIndex, newIndex);
-    const movedIndex = moved.findIndex((jog) => jog.id === active.id);
-    const before = moved[movedIndex - 1]?.order ?? null;
-    const after = moved[movedIndex + 1]?.order ?? null;
-    const newOrder = computeOrderBetween(before, after);
+    const { persist } = computeReorder(moved, active.id as string);
 
-    if (needsRebalance(before, after, newOrder)) {
-      await reorderJogs(moved.map((jog) => jog.id));
-      return;
+    if (persist.kind === 'bulk') {
+      await reorderJogs(persist.orderedIds);
+    } else {
+      await updateJogOrder(persist.id, persist.order);
     }
-
-    await updateJogOrder(active.id as string, newOrder);
   }
 
   async function confirmDelete() {

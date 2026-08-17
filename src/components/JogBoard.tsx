@@ -5,13 +5,13 @@ import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useS
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
-import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { computeReorder } from '@/lib/ordering';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
 import { TicketModal } from './TicketModal';
-import { ALL_JOGS_ID, ORDER_GAP, STATUSES, Ticket, TicketStatus } from '@/lib/types';
+import { ALL_JOGS_ID, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
 const SELECTED_JOG_STORAGE_KEY = 'tt_selected_jog_id';
 
@@ -140,44 +140,34 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       : (tickets.find((t) => t.id === overId)?.status ?? activeTicket.status);
     const statusChanged = activeTicket.status !== targetStatus;
 
-    const sorted = [...tickets].sort((a, b) => a.order - b.order);
-    const withoutActive = sorted.filter((t) => t.id !== activeId);
+    // The target column's own tickets (unfiltered by search/jog/epic — a drag always
+    // reasons about the full column, same as before) are the list `computeReorder` needs;
+    // status is its own concern, so the moved ticket is spliced in with it already applied.
+    const columnTickets = tickets.filter((t) => t.status === targetStatus && t.id !== activeId).sort((a, b) => a.order - b.order);
+    const insertIndex = overIsColumn ? columnTickets.length : columnTickets.findIndex((t) => t.id === overId);
+    const movedTicket: Ticket = { ...activeTicket, status: targetStatus };
+    const orderedList = [
+      ...columnTickets.slice(0, insertIndex === -1 ? columnTickets.length : insertIndex),
+      movedTicket,
+      ...columnTickets.slice(insertIndex === -1 ? columnTickets.length : insertIndex),
+    ];
 
-    let insertIndex: number;
-    if (overIsColumn) {
-      let lastInColumnIndex = -1;
-      for (let i = withoutActive.length - 1; i >= 0; i--) {
-        if (withoutActive[i].status === targetStatus) {
-          lastInColumnIndex = i;
-          break;
-        }
-      }
-      insertIndex = lastInColumnIndex === -1 ? withoutActive.length : lastInColumnIndex + 1;
-    } else {
-      insertIndex = withoutActive.findIndex((t) => t.id === overId);
-      if (insertIndex === -1) insertIndex = withoutActive.length;
-    }
+    const { orderUpdates, persist } = computeReorder(orderedList, activeId);
 
-    const before = withoutActive[insertIndex - 1]?.order ?? null;
-    const after = withoutActive[insertIndex]?.order ?? null;
-    const newOrder = computeOrderBetween(before, after);
+    setTickets((prev) =>
+      prev.map((t) => {
+        const newOrder = orderUpdates.get(t.id);
+        if (newOrder === undefined) return t;
+        return t.id === activeId ? { ...t, status: targetStatus, order: newOrder } : { ...t, order: newOrder };
+      }),
+    );
 
-    if (needsRebalance(before, after, newOrder)) {
-      const updatedActive: Ticket = { ...activeTicket, status: targetStatus };
-      const rebalanced = [
-        ...withoutActive.slice(0, insertIndex),
-        updatedActive,
-        ...withoutActive.slice(insertIndex),
-      ].map((ticket, index) => ({ ...ticket, order: index * ORDER_GAP }));
-
-      setTickets(rebalanced);
-
+    if (persist.kind === 'bulk') {
       await fetch('/api/tickets/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: rebalanced.map((t) => t.id) }),
+        body: JSON.stringify({ order: persist.orderedIds }),
       });
-
       if (statusChanged) {
         await fetch(`/api/tickets/${activeId}`, {
           method: 'PATCH',
@@ -185,16 +175,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           body: JSON.stringify({ status: targetStatus }),
         });
       }
-      return;
+    } else {
+      await fetch(`/api/tickets/${activeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(statusChanged ? { order: persist.order, status: targetStatus } : { order: persist.order }),
+      });
     }
-
-    setTickets((prev) => prev.map((t) => (t.id === activeId ? { ...t, order: newOrder, status: targetStatus } : t)));
-
-    await fetch(`/api/tickets/${activeId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: newOrder, status: targetStatus }),
-    });
   }
 
   function handleSaved(ticket: Ticket) {

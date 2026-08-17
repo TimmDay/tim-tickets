@@ -6,7 +6,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
-import { computeOrderBetween, needsRebalance } from '@/lib/ordering';
+import { computeReorder } from '@/lib/ordering';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
@@ -16,7 +16,7 @@ import { GripIcon } from './GripIcon';
 import { JogSelect } from './JogSelect';
 import { TicketModal } from './TicketModal';
 import { TrashIcon } from './TrashIcon';
-import { Epic, ORDER_GAP, STATUSES, Ticket } from '@/lib/types';
+import { Epic, STATUSES, Ticket } from '@/lib/types';
 
 type SortKey = 'manual' | 'title' | 'jog' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
@@ -166,39 +166,28 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
     if (oldIndex === -1 || newIndex === -1) return;
 
     const moved = arrayMove(visibleTickets, oldIndex, newIndex);
-    const movedIndex = moved.findIndex((t) => t.id === active.id);
-    // `moved` is sorted newest-first (descending `order`) when manually sorted, so the
-    // neighbor above the dragged row has the larger order and the neighbor below has the
-    // smaller one — the reverse of computeOrderBetween's ascending (before < after) convention.
-    const before = moved[movedIndex + 1]?.order ?? null;
-    const after = moved[movedIndex - 1]?.order ?? null;
-    const newOrder = computeOrderBetween(before, after);
+    // visibleTickets (and `moved`) are sorted newest-first (descending `order`) when manually
+    // sorted — see the manual sortKey comparator above.
+    const { orderUpdates, persist } = computeReorder(moved, active.id as string, 'desc');
 
-    if (needsRebalance(before, after, newOrder)) {
-      // `moved` is derived from visibleTickets, which excludes archived tickets — update order
-      // in place rather than replacing `tickets` wholesale, or archived tickets would be dropped
-      // from local state until the next reload. Index 0 (newest/top of the descending list)
-      // must get the highest order, so the mapping counts down rather than up.
-      const lastIndex = moved.length - 1;
-      const orderById = new Map(moved.map((ticket, index) => [ticket.id, (lastIndex - index) * ORDER_GAP]));
-      setTickets((prev) => prev.map((t) => (orderById.has(t.id) ? { ...t, order: orderById.get(t.id)! } : t)));
+    // `moved` is derived from visibleTickets, which excludes archived tickets — merge order
+    // updates in place rather than replacing `tickets` wholesale, or archived tickets would be
+    // dropped from local state until the next reload.
+    setTickets((prev) => prev.map((t) => (orderUpdates.has(t.id) ? { ...t, order: orderUpdates.get(t.id)! } : t)));
+
+    if (persist.kind === 'bulk') {
       await fetch('/api/tickets/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // reorderTickets assigns ascending order matching array position (first id = lowest
-        // order), so send the array oldest-first — the reverse of the newest-first `moved`.
-        body: JSON.stringify({ order: [...moved].reverse().map((t) => t.id) }),
+        body: JSON.stringify({ order: persist.orderedIds }),
       });
-      return;
+    } else {
+      await fetch(`/api/tickets/${persist.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: persist.order }),
+      });
     }
-
-    setTickets((prev) => prev.map((t) => (t.id === active.id ? { ...t, order: newOrder } : t)));
-
-    await fetch(`/api/tickets/${active.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: newOrder }),
-    });
   }
 
   function sortIndicator(key: SortKey) {

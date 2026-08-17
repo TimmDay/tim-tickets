@@ -43,7 +43,7 @@ export function AppHeader() {
             onClick={() => setShowCreate(true)}
             className="rounded-md bg-gray-900 px-2 py-1.5 text-sm font-medium text-white hover:bg-gray-800 sm:px-3 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
           >
-            <span className="sm:hidden">Add</span>
+            <span className="sm:hidden">+</span>
             <span className="hidden sm:inline">+ Add</span>
           </button>
           <ThemeToggle />

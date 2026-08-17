@@ -99,7 +99,10 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
     const direction = sortDirection === 'asc' ? 1 : -1;
     result = [...result].sort((a, b) => {
-      if (sortKey === 'manual') return a.order - b.order;
+      // Newest tickets get the highest `order` (see createTicket), so sorting manual order
+      // newest-first means descending — the most recently added tickets land at the top of
+      // the list instead of the bottom.
+      if (sortKey === 'manual') return b.order - a.order;
       if (sortKey === 'title') return a.title.localeCompare(b.title) * direction;
       if (sortKey === 'jog') {
         const nameA = jogNameById.get(a.jogId) ?? '';
@@ -158,20 +161,27 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
     const moved = arrayMove(visibleTickets, oldIndex, newIndex);
     const movedIndex = moved.findIndex((t) => t.id === active.id);
-    const before = moved[movedIndex - 1]?.order ?? null;
-    const after = moved[movedIndex + 1]?.order ?? null;
+    // `moved` is sorted newest-first (descending `order`) when manually sorted, so the
+    // neighbor above the dragged row has the larger order and the neighbor below has the
+    // smaller one — the reverse of computeOrderBetween's ascending (before < after) convention.
+    const before = moved[movedIndex + 1]?.order ?? null;
+    const after = moved[movedIndex - 1]?.order ?? null;
     const newOrder = computeOrderBetween(before, after);
 
     if (needsRebalance(before, after, newOrder)) {
       // `moved` is derived from visibleTickets, which excludes archived tickets — update order
       // in place rather than replacing `tickets` wholesale, or archived tickets would be dropped
-      // from local state until the next reload.
-      const orderById = new Map(moved.map((ticket, index) => [ticket.id, index * ORDER_GAP]));
+      // from local state until the next reload. Index 0 (newest/top of the descending list)
+      // must get the highest order, so the mapping counts down rather than up.
+      const lastIndex = moved.length - 1;
+      const orderById = new Map(moved.map((ticket, index) => [ticket.id, (lastIndex - index) * ORDER_GAP]));
       setTickets((prev) => prev.map((t) => (orderById.has(t.id) ? { ...t, order: orderById.get(t.id)! } : t)));
       await fetch('/api/tickets/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: moved.map((t) => t.id) }),
+        // reorderTickets assigns ascending order matching array position (first id = lowest
+        // order), so send the array oldest-first — the reverse of the newest-first `moved`.
+        body: JSON.stringify({ order: [...moved].reverse().map((t) => t.id) }),
       });
       return;
     }

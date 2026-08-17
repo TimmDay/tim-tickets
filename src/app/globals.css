@@ -57,3 +57,15 @@ body {
   border-color: #f3f4f6;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23111827' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8l3.5 3.5L13 5'/%3E%3C/svg%3E");
 }
+
+/* iOS Safari auto-zooms the page to fit a focused <input>/<select>/<textarea> whenever its
+   font-size is under 16px, and doesn't reliably zoom back out once it's blurred — which is
+   most of our form fields, since they use Tailwind's 14px `text-sm`. Floor it at 16px below
+   the `sm` breakpoint, where this only matters; desktop keeps the smaller 14px look. */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

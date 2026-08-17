@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useEpics } from '@/lib/EpicsContext';
 import { Epic } from '@/lib/types';
 
@@ -11,16 +11,33 @@ interface EpicSelectProps {
   includeArchived?: boolean;
 }
 
+// Rough max height of the open dropdown (option list + "+ New Epic" footer) — used to decide
+// whether it should open upward instead of downward so it doesn't render off the bottom of
+// the viewport, e.g. when the field sits near the bottom of the ticket modal on mobile.
+const DROPDOWN_HEIGHT_ESTIMATE = 260;
+
 export function EpicSelect({ value, onChange, className, includeArchived = false }: EpicSelectProps) {
   const { epics, createEpic } = useEpics();
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Same rationale as JogSelect: look up the trigger label against the full list so an
   // archived epic still shows its name, but only offer non-archived epics as new targets.
   const selected = epics.find((epic) => epic.id === value);
   const selectableEpics = epics.filter((epic) => includeArchived || !epic.isArchived);
+
+  function toggleOpen() {
+    if (!open) {
+      const spaceBelow = triggerRef.current
+        ? window.innerHeight - triggerRef.current.getBoundingClientRect().bottom
+        : Infinity;
+      setOpenUpward(spaceBelow < DROPDOWN_HEIGHT_ESTIMATE);
+    }
+    setOpen((prev) => !prev);
+  }
 
   function closeAndReset() {
     setOpen(false);
@@ -44,8 +61,9 @@ export function EpicSelect({ value, onChange, className, includeArchived = false
   return (
     <div className={`relative ${className ?? ''}`}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={toggleOpen}
         className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
       >
         {selected?.name ?? 'No epic'}
@@ -54,7 +72,11 @@ export function EpicSelect({ value, onChange, className, includeArchived = false
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={closeAndReset} />
-          <div className="absolute z-20 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+          <div
+            className={`absolute z-20 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${
+              openUpward ? 'bottom-full mb-1' : 'mt-1'
+            }`}
+          >
             <ul className="max-h-48 overflow-auto">
               <li>
                 <button

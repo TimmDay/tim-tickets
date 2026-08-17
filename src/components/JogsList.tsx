@@ -20,7 +20,7 @@ interface JogsListProps {
 }
 
 export function JogsList({ ticketCounts }: JogsListProps) {
-  const { jogs, deleteJog, reorderJogs, updateJogOrder, completeJog } = useJogs();
+  const { jogs, defaultJogId, deleteJog, reorderJogs, updateJogOrder, completeJog } = useJogs();
   const [editingJog, setEditingJog] = useState<Jog | null>(null);
   const [deletingJog, setDeletingJog] = useState<Jog | null>(null);
   const [completingJog, setCompletingJog] = useState<Jog | null>(null);
@@ -36,11 +36,6 @@ export function JogsList({ ticketCounts }: JogsListProps) {
       .filter((jog) => !query || jog.name.toLowerCase().includes(query))
       .sort((a, b) => a.order - b.order);
   }, [jogs, showArchived, filterText]);
-  const defaultJogId = useMemo(
-    () => jogs.reduce((earliest, jog) => (jog.createdAt < earliest.createdAt ? jog : earliest), jogs[0])?.id,
-    [jogs],
-  );
-
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   async function handleDragEnd(event: DragEndEvent) {

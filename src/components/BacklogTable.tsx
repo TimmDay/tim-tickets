@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -22,7 +22,7 @@ type SortKey = 'manual' | 'title' | 'jog' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
 
 export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
-  const { jogs } = useJogs();
+  const { jogs, defaultJogId } = useJogs();
   const { epics } = useEpics();
   const [tickets, setTickets] = useState(initialTickets);
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
@@ -34,6 +34,16 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   const [search, setSearch] = useState('');
   const [jogFilter, setJogFilter] = useState('all');
+  const hasAppliedDefaultJogFilter = useRef(false);
+
+  // `jogs` is fetched client-side (see JogsContext) so `defaultJogId` isn't known on the
+  // first render or two — apply it once it becomes available, but only ever once, so it
+  // doesn't clobber a filter the user has since changed.
+  useEffect(() => {
+    if (hasAppliedDefaultJogFilter.current || !defaultJogId) return;
+    hasAppliedDefaultJogFilter.current = true;
+    setJogFilter(defaultJogId);
+  }, [defaultJogId]);
   const [epicFilter, setEpicFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -51,9 +61,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   // Reordering assumes visibleTickets is exactly the full underlying list (just re-sorted),
   // so it can safely be disabled whenever any filter — including "hide archived", which is
-  // the default — narrows what's shown.
+  // the default — narrows what's shown. The backlog (default) jog is the one exception:
+  // it's the landing view (see the default-jog-filter effect above), so it stays reorderable
+  // even though it's technically a filter — every other jog and "All tickets" behave as before.
   const canReorder =
-    sortKey === 'manual' && !search.trim() && jogFilter === 'all' && epicFilter === 'all' && !showArchived;
+    sortKey === 'manual' &&
+    !search.trim() &&
+    (jogFilter === 'all' || jogFilter === defaultJogId) &&
+    epicFilter === 'all' &&
+    !showArchived;
 
   function toggleSort(key: Exclude<SortKey, 'manual'>) {
     if (sortKey === key) {
@@ -89,7 +105,10 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
     const direction = sortDirection === 'asc' ? 1 : -1;
     result = [...result].sort((a, b) => {
-      if (sortKey === 'manual') return a.order - b.order;
+      // Newest tickets get the highest `order` (see createTicket), so sorting manual order
+      // newest-first means descending — the most recently added tickets land at the top of
+      // the list instead of the bottom.
+      if (sortKey === 'manual') return b.order - a.order;
       if (sortKey === 'title') return a.title.localeCompare(b.title) * direction;
       if (sortKey === 'jog') {
         const nameA = jogNameById.get(a.jogId) ?? '';
@@ -148,20 +167,27 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
     const moved = arrayMove(visibleTickets, oldIndex, newIndex);
     const movedIndex = moved.findIndex((t) => t.id === active.id);
-    const before = moved[movedIndex - 1]?.order ?? null;
-    const after = moved[movedIndex + 1]?.order ?? null;
+    // `moved` is sorted newest-first (descending `order`) when manually sorted, so the
+    // neighbor above the dragged row has the larger order and the neighbor below has the
+    // smaller one — the reverse of computeOrderBetween's ascending (before < after) convention.
+    const before = moved[movedIndex + 1]?.order ?? null;
+    const after = moved[movedIndex - 1]?.order ?? null;
     const newOrder = computeOrderBetween(before, after);
 
     if (needsRebalance(before, after, newOrder)) {
       // `moved` is derived from visibleTickets, which excludes archived tickets — update order
       // in place rather than replacing `tickets` wholesale, or archived tickets would be dropped
-      // from local state until the next reload.
-      const orderById = new Map(moved.map((ticket, index) => [ticket.id, index * ORDER_GAP]));
+      // from local state until the next reload. Index 0 (newest/top of the descending list)
+      // must get the highest order, so the mapping counts down rather than up.
+      const lastIndex = moved.length - 1;
+      const orderById = new Map(moved.map((ticket, index) => [ticket.id, (lastIndex - index) * ORDER_GAP]));
       setTickets((prev) => prev.map((t) => (orderById.has(t.id) ? { ...t, order: orderById.get(t.id)! } : t)));
       await fetch('/api/tickets/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: moved.map((t) => t.id) }),
+        // reorderTickets assigns ascending order matching array position (first id = lowest
+        // order), so send the array oldest-first — the reverse of the newest-first `moved`.
+        body: JSON.stringify({ order: [...moved].reverse().map((t) => t.id) }),
       });
       return;
     }
@@ -189,12 +215,12 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
             onChange={(event) => setJogFilter(event.target.value)}
             className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
-            <option value="all">All jogs</option>
             {visibleJogs.map((jog) => (
               <option key={jog.id} value={jog.id}>
                 {jog.name}
               </option>
             ))}
+            <option value="all">All tickets</option>
           </select>
           <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         </div>

@@ -1,10 +1,13 @@
 'use client';
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Jog, ORDER_GAP } from './types';
 
 interface JogsContextValue {
   jogs: Jog[];
+  /** The structurally-special default jog (earliest-created, guaranteed to always exist
+   * once jogs have loaded) — undefined only until the initial fetch resolves. */
+  defaultJogId: string | undefined;
   refresh: () => Promise<void>;
   createJog: (name: string, startDate?: string | null, endDate?: string | null) => Promise<Jog>;
   updateJog: (id: string, name: string, startDate: string | null, endDate: string | null) => Promise<void>;
@@ -91,6 +94,11 @@ export function JogsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const defaultJogId = useMemo(
+    () => jogs.reduce((earliest, jog) => (jog.createdAt < earliest.createdAt ? jog : earliest), jogs[0])?.id,
+    [jogs],
+  );
+
   const completeJog = useCallback(async (id: string) => {
     const response = await fetch(`/api/jogs/${id}/complete`, { method: 'POST' });
     if (!response.ok) {
@@ -102,7 +110,7 @@ export function JogsProvider({ children }: { children: ReactNode }) {
 
   return (
     <JogsContext.Provider
-      value={{ jogs, refresh, createJog, updateJog, updateJogOrder, deleteJog, reorderJogs, completeJog }}
+      value={{ jogs, defaultJogId, refresh, createJog, updateJog, updateJogOrder, deleteJog, reorderJogs, completeJog }}
     >
       {children}
     </JogsContext.Provider>

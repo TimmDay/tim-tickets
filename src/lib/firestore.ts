@@ -101,7 +101,6 @@ function toTicket(doc: QueryDocumentSnapshot): Ticket {
     key: data.key ?? '',
     title: data.title,
     body: data.body,
-    acceptanceCriteria: data.acceptanceCriteria ?? '',
     status: data.status,
     jogId: data.jogId,
     epicId: data.epicId ?? null,
@@ -301,7 +300,6 @@ export async function getTicketByKey(key: string): Promise<Ticket | null> {
 export interface CreateTicketInput {
   title: string;
   body: string;
-  acceptanceCriteria: string;
   jogId: string;
   epicId: string | null;
   priority: Priority | null;
@@ -316,7 +314,6 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
     key: `T-${keyNumber}`,
     title: input.title,
     body: input.body,
-    acceptanceCriteria: input.acceptanceCriteria,
     status: 'todo' as TicketStatus,
     jogId: input.jogId,
     epicId: input.epicId,
@@ -347,7 +344,6 @@ export async function reorderTickets(orderedIds: string[]): Promise<void> {
 export interface UpdateTicketInput {
   title?: string;
   body?: string;
-  acceptanceCriteria?: string;
   status?: TicketStatus;
   jogId?: string;
   epicId?: string | null;

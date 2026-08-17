@@ -37,7 +37,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
       </head>
-      <body className="h-full flex flex-col">{children}</body>
+      {/* Below lg, the app shell isn't clamped to the viewport — the page grows with its
+          content and scrolls normally, so the footer scrolls into view instead of being
+          permanently pinned to the bottom. lg and up keeps the fixed-height shell with each
+          page's own internal scroll container. */}
+      <body className="flex min-h-dvh flex-col lg:h-full">{children}</body>
     </html>
   );
 }

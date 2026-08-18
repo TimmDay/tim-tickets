@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { EpicChip } from './EpicChip';
+import { Linkified } from './Linkified';
 import { useEpics } from '@/lib/EpicsContext';
 import { Priority, Ticket } from '@/lib/types';
 
@@ -122,7 +123,9 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
             <ul className="max-h-40 space-y-1.5 overflow-y-auto">
               {ticket.comments.map((comment) => (
                 <li key={comment.id}>
-                  <p className="text-gray-700 dark:text-gray-300">{comment.body}</p>
+                  <p className="text-gray-700 dark:text-gray-300">
+                    <Linkified text={comment.body} />
+                  </p>
                   <p className="text-[10px] text-gray-400 dark:text-gray-500">
                     {new Date(comment.createdAt).toLocaleString()}
                   </p>

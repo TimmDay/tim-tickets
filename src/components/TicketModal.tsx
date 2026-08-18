@@ -6,6 +6,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { EpicSelect } from './EpicSelect';
 import { JogSelect } from './JogSelect';
 import { LinkIcon } from './LinkIcon';
+import { Linkified } from './Linkified';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
@@ -391,7 +392,9 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </button>
-                  <p className="text-gray-800 dark:text-gray-200">{comment.body}</p>
+                  <p className="text-gray-800 dark:text-gray-200">
+                    <Linkified text={comment.body} />
+                  </p>
                   <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                     {new Date(comment.createdAt).toLocaleString()}
                   </p>

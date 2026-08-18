@@ -6,6 +6,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { EpicSelect } from './EpicSelect';
 import { JogSelect } from './JogSelect';
 import { LinkIcon } from './LinkIcon';
+import { Linkified } from './Linkified';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
@@ -55,6 +56,14 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   function handleCancel() {
     clearDraft();
     onClose();
+  }
+
+  function handleInsertChecklistItem() {
+    const checklistPrefix = '- [ ] ';
+    // Always appends a fresh checklist line at the end — precise mid-text cursor placement is
+    // fiddly on a touch keyboard, so this button is a "quick add" rather than an insert-here.
+    // No leading newline when the body is still empty, since the inserted text IS the top line.
+    setBody((prev) => (prev === '' ? checklistPrefix : `${prev}\n${checklistPrefix}`));
   }
 
   const [comments, setComments] = useState<Comment[]>(ticket?.comments ?? []);
@@ -225,7 +234,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="space-y-3 lg:col-span-2">
+            <div className="space-y-3 lg:col-span-2 lg:flex lg:flex-col">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
                 <input
@@ -237,29 +246,39 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
+              {/* flex-1 on desktop only: stretches Body to the height of the grid row (set by
+                  whichever column — this one or the Jog/Epic/... one alongside it — is taller),
+                  so its bottom edge lines up with Due date's instead of stopping at a fixed
+                  10 rows regardless of how tall the other column ends up. */}
+              <div className="lg:flex lg:flex-1 lg:flex-col">
+                <div className="mb-1 flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
+                  <button
+                    type="button"
+                    onClick={handleInsertChecklistItem}
+                    title="Add a checklist item"
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                  >
+                    - [ ]
+                  </button>
+                </div>
                 <textarea
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   rows={10}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:flex-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
             </div>
 
-            <div className="space-y-3 lg:col-span-1">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
-                <JogSelect value={jogId} onChange={setJogId} />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
-                <EpicSelect value={epicId} onChange={setEpicId} />
-              </div>
-
-              <div>
+            {/* Its own small grid rather than a plain vertical stack: mobile needs Tags+Priority
+                and Jog+Epic to each share a row, in a different order than desktop's single
+                column (Jog, Epic, Tags, Priority, Due date) — `order-*` expresses both without
+                duplicating any field. Kept as its own grid (not folded into the outer one above)
+                so its row heights are never shared with Body's — sharing rows with a tall
+                multi-line body previously stretched Epic's row to match, leaving a gap below it. */}
+            <div className="grid grid-cols-6 gap-x-3 gap-y-3 lg:col-span-1 lg:grid-cols-1 lg:gap-y-3">
+              <div className="order-1 col-span-4 lg:order-3 lg:col-span-1">
                 <div className="mb-1 flex flex-wrap items-center gap-1.5">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
                   {tags.map((tag) => (
@@ -275,7 +294,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 />
               </div>
 
-              <div>
+              <div className="order-2 col-span-2 lg:order-4 lg:col-span-1">
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
                 <div className="relative">
                   <select
@@ -296,7 +315,17 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 </div>
               </div>
 
-              <div>
+              <div className="order-3 col-span-4 lg:order-1 lg:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
+                <JogSelect value={jogId} onChange={setJogId} />
+              </div>
+
+              <div className="order-4 col-span-2 lg:order-2 lg:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
+                <EpicSelect value={epicId} onChange={setEpicId} />
+              </div>
+
+              <div className="order-5 col-span-6 lg:order-5 lg:col-span-1">
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
                 <input
                   type="date"
@@ -367,7 +396,9 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   >
                     <XIcon className="h-3.5 w-3.5" />
                   </button>
-                  <p className="text-gray-800 dark:text-gray-200">{comment.body}</p>
+                  <p className="text-gray-800 dark:text-gray-200">
+                    <Linkified text={comment.body} />
+                  </p>
                   <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                     {new Date(comment.createdAt).toLocaleString()}
                   </p>

@@ -119,7 +119,6 @@ export function JogsList({ ticketCounts }: JogsListProps) {
                   <th className="px-3 py-2 font-medium">End date</th>
                   <th className="px-3 py-2 font-medium">Tickets</th>
                   <th className="px-3 py-2 font-medium" />
-                  <th className="w-8 px-2 py-2" />
                 </tr>
               </thead>
               <SortableContext items={displayedJogs.map((jog) => jog.id)} strategy={verticalListSortingStrategy}>
@@ -137,7 +136,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
                   ))}
                   {displayedJogs.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={6} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
                         No jogs yet.
                       </td>
                     </tr>
@@ -240,13 +239,6 @@ function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onCompl
         <div className="flex items-center justify-end gap-3">
           <button
             type="button"
-            onClick={onEdit}
-            className="text-sm text-gray-600 hover:underline dark:text-gray-400"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
             onClick={onComplete}
             disabled={isDefault || jog.isArchived}
             title={isDefault ? "Can't complete the default jog" : jog.isArchived ? 'Already archived' : undefined}
@@ -258,21 +250,28 @@ function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onCompl
           >
             Complete
           </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            aria-label="Edit jog"
+            title="Edit jog"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isDefault}
+            title={isDefault ? "Can't delete the default jog" : undefined}
+            className={`text-gray-400 dark:text-gray-500 ${
+              isDefault ? 'cursor-not-allowed opacity-30' : 'hover:text-red-600 dark:hover:text-red-400'
+            }`}
+            aria-label="Delete jog"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
         </div>
-      </td>
-      <td className="px-2 py-2 text-right">
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={isDefault}
-          title={isDefault ? "Can't delete the default jog" : undefined}
-          className={`text-gray-400 dark:text-gray-500 ${
-            isDefault ? 'cursor-not-allowed opacity-30' : 'hover:text-red-600 dark:hover:text-red-400'
-          }`}
-          aria-label="Delete jog"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
       </td>
     </tr>
   );

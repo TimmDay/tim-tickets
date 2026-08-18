@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ChevronDownIcon } from './ChevronDownIcon';
@@ -17,6 +17,19 @@ interface JogColumnProps {
 export function JogColumn({ status, label, tickets, onSelectTicket }: JogColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const [collapsed, setCollapsed] = useState(false);
+
+  // Defaults every column but In Progress to closed on mobile — but only there, since desktop
+  // shows all columns side by side where collapsing isn't the useful default. Must happen
+  // post-mount (not during the initial render) since window isn't available during server
+  // rendering and reading it there would cause a hydration mismatch — the `lg:` breakpoint here
+  // (1024px) matches the one this app already uses everywhere else for the mobile/desktop split.
+  useEffect(() => {
+    const isMobile = window.matchMedia('(max-width: 1023px)').matches;
+    if (isMobile && status !== 'in_progress') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- setting the mobile default genuinely cannot happen during render without a hydration mismatch
+      setCollapsed(true);
+    }
+  }, [status]);
 
   return (
     <div

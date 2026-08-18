@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { Epic, getEpicColorTheme } from '@/lib/types';
+import { useTapTooltip } from '@/lib/useTapTooltip';
 
 interface EpicChipProps {
   epic: Epic;
@@ -10,29 +10,7 @@ interface EpicChipProps {
 
 export function EpicChip({ epic, className }: EpicChipProps) {
   const theme = getEpicColorTheme(epic.colorTheme);
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    // Mobile browsers hold the tap-simulated :hover state open until the next tap, so a
-    // tooltip opened by tapping the chip would otherwise stay pinned in place while the
-    // page scrolls underneath it. Close it on any scroll, and on a tap outside the chip.
-    function handleScroll() {
-      setOpen(false);
-    }
-    function handlePointerDown(event: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => {
-      window.removeEventListener('scroll', handleScroll, { capture: true });
-      document.removeEventListener('pointerdown', handlePointerDown);
-    };
-  }, [open]);
+  const { open, setOpen, containerRef } = useTapTooltip<HTMLSpanElement>();
 
   return (
     <span

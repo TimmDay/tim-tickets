@@ -232,99 +232,103 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </div>
           )}
 
-          {/* A flat 6-column grid rather than nested Title+Body / Jog+Epic+Tags+Priority+DueDate
-              columns: mobile needs Tags+Priority and Jog+Epic to each share a row directly under
-              Body — a different field order than desktop's two-column layout — which `order-*`
-              on individual siblings can express but two separately-flowing wrapper divs can't.
-              Desktop resets `order` and instead places each field at an explicit row/column so
-              the visual result matches the original two-column layout exactly. */}
-          <div className="grid grid-cols-6 gap-x-3 gap-y-3 lg:grid-cols-3 lg:gap-4">
-            <div className="order-1 col-span-6 lg:order-none lg:col-start-1 lg:col-span-2 lg:row-start-1">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                autoFocus
-                required
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              />
-            </div>
-
-            <div className="order-2 col-span-6 lg:order-none lg:col-start-1 lg:col-span-2 lg:row-start-2">
-              <div className="mb-1 flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
-                <button
-                  type="button"
-                  onClick={handleInsertChecklistItem}
-                  title="Add a checklist item"
-                  className="rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
-                >
-                  - [ ]
-                </button>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="space-y-3 lg:col-span-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  autoFocus
+                  required
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
               </div>
-              <textarea
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                rows={10}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              />
-            </div>
 
-            <div className="order-3 col-span-4 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-3">
-              <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
-                {tags.map((tag) => (
-                  <TagChip key={tag} tag={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))} />
-                ))}
+              <div>
+                <div className="mb-1 flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
+                  <button
+                    type="button"
+                    onClick={handleInsertChecklistItem}
+                    title="Add a checklist item"
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                  >
+                    - [ ]
+                  </button>
+                </div>
+                <textarea
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  rows={10}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
               </div>
-              <TagInput
-                value={tags}
-                onChange={setTags}
-                options={BASE_TAGS}
-                placeholder="Type to search or add a tag…"
-                showChips={false}
-              />
             </div>
 
-            <div className="order-4 col-span-2 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-4">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-              <div className="relative">
-                <select
-                  value={priority ?? ''}
-                  onChange={(event) =>
-                    setPriority(event.target.value === '' ? null : (event.target.value as Priority))
-                  }
-                  className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                >
-                  <option value="">No priority</option>
-                  {PRIORITIES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
+            {/* Its own small grid rather than a plain vertical stack: mobile needs Tags+Priority
+                and Jog+Epic to each share a row, in a different order than desktop's single
+                column (Jog, Epic, Tags, Priority, Due date) — `order-*` expresses both without
+                duplicating any field. Kept as its own grid (not folded into the outer one above)
+                so its row heights are never shared with Body's — sharing rows with a tall
+                multi-line body previously stretched Epic's row to match, leaving a gap below it. */}
+            <div className="grid grid-cols-6 gap-x-3 gap-y-3 lg:col-span-1 lg:grid-cols-1 lg:gap-y-3">
+              <div className="order-1 col-span-4 lg:order-3 lg:col-span-1">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
+                  {tags.map((tag) => (
+                    <TagChip key={tag} tag={tag} onRemove={() => setTags(tags.filter((t) => t !== tag))} />
                   ))}
-                </select>
-                <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
+                <TagInput
+                  value={tags}
+                  onChange={setTags}
+                  options={BASE_TAGS}
+                  placeholder="Type to search or add a tag…"
+                  showChips={false}
+                />
               </div>
-            </div>
 
-            <div className="order-5 col-span-4 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-1">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
-              <JogSelect value={jogId} onChange={setJogId} />
-            </div>
+              <div className="order-2 col-span-2 lg:order-4 lg:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+                <div className="relative">
+                  <select
+                    value={priority ?? ''}
+                    onChange={(event) =>
+                      setPriority(event.target.value === '' ? null : (event.target.value as Priority))
+                    }
+                    className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  >
+                    <option value="">No priority</option>
+                    {PRIORITIES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                </div>
+              </div>
 
-            <div className="order-6 col-span-2 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
-              <EpicSelect value={epicId} onChange={setEpicId} />
-            </div>
+              <div className="order-3 col-span-4 lg:order-1 lg:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
+                <JogSelect value={jogId} onChange={setJogId} />
+              </div>
 
-            <div className="order-7 col-span-6 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-5">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
-              <input
-                type="date"
-                value={dueDate ?? ''}
-                onChange={(event) => setDueDate(event.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-              />
+              <div className="order-4 col-span-2 lg:order-2 lg:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
+                <EpicSelect value={epicId} onChange={setEpicId} />
+              </div>
+
+              <div className="order-5 col-span-6 lg:order-5 lg:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
+                <input
+                  type="date"
+                  value={dueDate ?? ''}
+                  onChange={(event) => setDueDate(event.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+              </div>
             </div>
           </div>
 

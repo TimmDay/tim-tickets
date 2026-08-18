@@ -57,6 +57,14 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     onClose();
   }
 
+  function handleInsertChecklistItem() {
+    const checklistPrefix = '- [ ] ';
+    // Always appends a fresh checklist line at the end — precise mid-text cursor placement is
+    // fiddly on a touch keyboard, so this button is a "quick add" rather than an insert-here.
+    // No leading newline when the body is still empty, since the inserted text IS the top line.
+    setBody((prev) => (prev === '' ? checklistPrefix : `${prev}\n${checklistPrefix}`));
+  }
+
   const [comments, setComments] = useState<Comment[]>(ticket?.comments ?? []);
   const [newComment, setNewComment] = useState('');
   const [addingComment, setAddingComment] = useState(false);
@@ -238,7 +246,17 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
+                <div className="mb-1 flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
+                  <button
+                    type="button"
+                    onClick={handleInsertChecklistItem}
+                    title="Add a checklist item"
+                    className="rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                  >
+                    - [ ]
+                  </button>
+                </div>
                 <textarea
                   value={body}
                   onChange={(event) => setBody(event.target.value)}

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { deleteJog, updateJog } from '@/lib/firestore';
+import { jogsRepo } from '@/lib/repos';
 
 const updateJogSchema = z.object({
   name: z.string().trim().min(1).optional(),
@@ -18,14 +18,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  await updateJog(id, parsed.data);
+  await jogsRepo.updateJog(id, parsed.data);
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    await deleteJog(id);
+    await jogsRepo.deleteJog(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to delete jog';

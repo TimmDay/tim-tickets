@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { completeJog } from '@/lib/firestore';
+import { jogsRepo } from '@/lib/repos';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    await completeJog(id);
+    await jogsRepo.completeJog(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to complete jog';

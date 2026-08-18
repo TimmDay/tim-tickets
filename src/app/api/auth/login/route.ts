@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkPassword, createSessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
-import { clearLoginAttempts, isLoginRateLimited, recordFailedLogin } from '@/lib/firestore';
+import { loginAttemptsRepo } from '@/lib/repos';
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -11,7 +11,7 @@ function getClientIp(request: Request): string {
 export async function POST(request: Request) {
   const ip = getClientIp(request);
 
-  if (await isLoginRateLimited(ip)) {
+  if (await loginAttemptsRepo.isLoginRateLimited(ip)) {
     return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 });
   }
 
@@ -19,11 +19,11 @@ export async function POST(request: Request) {
   const password = body?.password;
 
   if (typeof password !== 'string' || !checkPassword(password)) {
-    await recordFailedLogin(ip);
+    await loginAttemptsRepo.recordFailedLogin(ip);
     return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
   }
 
-  await clearLoginAttempts(ip);
+  await loginAttemptsRepo.clearLoginAttempts(ip);
 
   const token = await createSessionToken();
   const response = NextResponse.json({ ok: true });

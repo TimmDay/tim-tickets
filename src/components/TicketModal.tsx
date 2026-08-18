@@ -234,7 +234,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
           )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="space-y-3 lg:col-span-2">
+            <div className="space-y-3 lg:col-span-2 lg:flex lg:flex-col">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
                 <input
@@ -246,7 +246,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 />
               </div>
 
-              <div>
+              {/* flex-1 on desktop only: stretches Body to the height of the grid row (set by
+                  whichever column — this one or the Jog/Epic/... one alongside it — is taller),
+                  so its bottom edge lines up with Due date's instead of stopping at a fixed
+                  10 rows regardless of how tall the other column ends up. */}
+              <div className="lg:flex lg:flex-1 lg:flex-col">
                 <div className="mb-1 flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Body</label>
                   <button
@@ -262,7 +266,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   rows={10}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 lg:flex-1 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
             </div>

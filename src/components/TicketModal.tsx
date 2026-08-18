@@ -307,12 +307,12 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               </div>
             </div>
 
-            <div className="order-5 col-span-6 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-1">
+            <div className="order-5 col-span-3 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-1">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog</label>
               <JogSelect value={jogId} onChange={setJogId} />
             </div>
 
-            <div className="order-6 col-span-6 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-2">
+            <div className="order-6 col-span-3 lg:order-none lg:col-start-3 lg:col-span-1 lg:row-start-2">
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
               <EpicSelect value={epicId} onChange={setEpicId} />
             </div>

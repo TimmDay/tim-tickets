@@ -11,7 +11,7 @@ export function AppFooter() {
   }
 
   return (
-    <footer className="shrink-0 border-t border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <footer className="shrink-0 border-t border-gray-200 bg-white lg:hidden dark:border-gray-800 dark:bg-gray-900">
       <div className="mx-auto flex max-w-5xl justify-end px-3 py-2 sm:px-4">
         <button
           type="button"

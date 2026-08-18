@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useEpics } from '@/lib/EpicsContext';
+import { useTapTooltip } from '@/lib/useTapTooltip';
+import { ArchiveIcon } from './ArchiveIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { EpicModal } from './EpicModal';
 import { FilterInput } from './FilterInput';
@@ -93,12 +95,10 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
             <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
               <tr>
                 <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Created</th>
                 <th className="px-3 py-2 font-medium">Started</th>
                 <th className="px-3 py-2 font-medium">Completed</th>
                 <th className="px-3 py-2 font-medium">Tickets</th>
                 <th className="px-3 py-2 font-medium" />
-                <th className="w-8 px-2 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -114,7 +114,7 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
               ))}
               {displayedEpics.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={5} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
                     No epics yet.
                   </td>
                 </tr>
@@ -190,39 +190,43 @@ function EpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProp
           {epic.name}
         </Link>
       </td>
-      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.createdAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.startedAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.completedAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{ticketCount}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-3">
-          <button type="button" onClick={onEdit} className="text-sm text-gray-600 hover:underline dark:text-gray-400">
-            Edit
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            aria-label="Edit epic"
+            title="Edit epic"
+          >
+            <PencilIcon className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={onArchive}
             disabled={epic.isArchived}
-            title={epic.isArchived ? 'Already archived' : undefined}
-            className={`text-sm ${
+            aria-label="Archive epic"
+            title={epic.isArchived ? 'Already archived' : 'Archive epic'}
+            className={
               epic.isArchived
                 ? 'cursor-not-allowed text-gray-300 dark:text-gray-700'
-                : 'text-gray-600 hover:underline dark:text-gray-400'
-            }`}
+                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+            }
           >
-            Archive
+            <ArchiveIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
+            aria-label="Delete epic"
+          >
+            <TrashIcon className="h-4 w-4" />
           </button>
         </div>
-      </td>
-      <td className="px-2 py-2 text-right">
-        <button
-          type="button"
-          onClick={onDelete}
-          className="text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
-          aria-label="Delete epic"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
       </td>
     </tr>
   );
@@ -237,29 +241,7 @@ interface EpicCardProps {
 }
 
 function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardProps) {
-  const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const descriptionRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!descriptionOpen) return;
-    // Mirrors EpicChip's tap-tooltip behavior: mobile browsers hold the tap-simulated :hover
-    // state open until the next tap, so close on scroll or an outside tap rather than leaving
-    // it pinned in place while the page scrolls underneath it.
-    function handleScroll() {
-      setDescriptionOpen(false);
-    }
-    function handlePointerDown(event: PointerEvent) {
-      if (descriptionRef.current && !descriptionRef.current.contains(event.target as Node)) {
-        setDescriptionOpen(false);
-      }
-    }
-    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => {
-      window.removeEventListener('scroll', handleScroll, { capture: true });
-      document.removeEventListener('pointerdown', handlePointerDown);
-    };
-  }, [descriptionOpen]);
+  const { open: descriptionOpen, setOpen: setDescriptionOpen, containerRef: descriptionRef } = useTapTooltip<HTMLSpanElement>();
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">

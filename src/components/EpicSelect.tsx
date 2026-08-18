@@ -64,7 +64,7 @@ export function EpicSelect({ value, onChange, className, includeArchived = false
         ref={triggerRef}
         type="button"
         onClick={toggleOpen}
-        className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        className="w-full truncate rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
       >
         {selected?.name ?? 'No epic'}
       </button>

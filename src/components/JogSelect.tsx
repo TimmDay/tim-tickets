@@ -66,7 +66,7 @@ export function JogSelect({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        className="w-full truncate rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
       >
         {includeAllOption && value === ALL_JOGS_ID ? 'All tickets' : (selected?.name ?? 'Select jog')}
       </button>

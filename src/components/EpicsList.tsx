@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useEpics } from '@/lib/EpicsContext';
 import { ConfirmModal } from './ConfirmModal';
@@ -237,19 +237,66 @@ interface EpicCardProps {
 }
 
 function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardProps) {
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const descriptionRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!descriptionOpen) return;
+    // Mirrors EpicChip's tap-tooltip behavior: mobile browsers hold the tap-simulated :hover
+    // state open until the next tap, so close on scroll or an outside tap rather than leaving
+    // it pinned in place while the page scrolls underneath it.
+    function handleScroll() {
+      setDescriptionOpen(false);
+    }
+    function handlePointerDown(event: PointerEvent) {
+      if (descriptionRef.current && !descriptionRef.current.contains(event.target as Node)) {
+        setDescriptionOpen(false);
+      }
+    }
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [descriptionOpen]);
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-start justify-between gap-2">
-        <Link
-          href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}
-          title="View on Current Jog board"
-          className={`inline-flex items-center gap-1.5 text-left text-sm font-medium hover:underline ${
-            epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
-          }`}
-        >
-          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEpicColorTheme(epic.colorTheme).dotClassName}`} />
-          {epic.name}
-        </Link>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Link
+            href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}
+            title="View on Current Jog board"
+            className={`inline-flex items-center gap-1.5 text-left text-sm font-medium hover:underline ${
+              epic.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+            }`}
+          >
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEpicColorTheme(epic.colorTheme).dotClassName}`} />
+            {epic.name}
+          </Link>
+          {epic.description && (
+            <span
+              ref={descriptionRef}
+              className="relative shrink-0"
+              onClick={(event) => {
+                event.stopPropagation();
+                setDescriptionOpen((prev) => !prev);
+              }}
+            >
+              <span className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
+                ⓘ
+              </span>
+              <span
+                className={`pointer-events-none absolute top-full left-0 z-20 mt-1.5 w-48 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-normal text-white shadow-lg transition-opacity dark:bg-gray-700 ${
+                  descriptionOpen ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                {epic.description}
+              </span>
+            </span>
+          )}
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
@@ -273,7 +320,6 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           {ticketCount} ticket{ticketCount === 1 ? '' : 's'}
         </span>
-        <span>Created {formatDate(epic.createdAt)}</span>
         <span>Started {formatDate(epic.startedAt)}</span>
         <span>Completed {formatDate(epic.completedAt)}</span>
       </div>

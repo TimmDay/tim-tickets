@@ -10,6 +10,7 @@ function toJog(doc: DocSnapshotLike): Jog {
     endDate: (data.endDate as string | null) ?? null,
     order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
     isArchived: (data.isArchived as boolean) ?? false,
+    isCurrent: (data.isCurrent as boolean) ?? false,
     createdAt: data.createdAt as string,
   };
 }
@@ -42,6 +43,7 @@ export function createJogsRepo(db: FirestoreLike) {
       endDate: null,
       order: Date.now(),
       isArchived: false,
+      isCurrent: false,
       createdAt: now,
     };
     const ref = await jogsCollection().add(data);
@@ -56,9 +58,28 @@ export function createJogsRepo(db: FirestoreLike) {
 
   async function createJog(name: string, startDate: string | null = null, endDate: string | null = null): Promise<Jog> {
     const now = new Date().toISOString();
-    const data = { name, startDate, endDate, order: Date.now(), isArchived: false, createdAt: now };
+    const data = { name, startDate, endDate, order: Date.now(), isArchived: false, isCurrent: false, createdAt: now };
     const ref = await jogsCollection().add(data);
     return { id: ref.id, ...data };
+  }
+
+  /** Marks (or unmarks) a jog as the current jog. Only one jog can be current at a time,
+   * so setting one clears the flag on whichever jog previously held it. The default jog
+   * can't be current — it's the catch-all backlog, not a jog someone is actively working. */
+  async function setCurrentJog(id: string, current: boolean): Promise<void> {
+    if (current) {
+      const defaultJog = await ensureDefaultJog();
+      if (id === defaultJog.id) {
+        throw new Error('Cannot mark the default jog as current');
+      }
+    }
+
+    const newCurrentId = current ? id : null;
+    const snapshot = await jogsCollection().get();
+    const mutations: ((batch: WriteBatchLike) => void)[] = snapshot.docs
+      .filter((doc) => Boolean(doc.data()?.isCurrent) !== (doc.id === newCurrentId))
+      .map((doc) => (batch) => batch.update(jogsCollection().doc(doc.id), { isCurrent: doc.id === newCurrentId }));
+    await commitInChunks(db, mutations);
   }
 
   /** Rebalances the given jogs to evenly-spaced order values. Only needed when
@@ -101,7 +122,7 @@ export function createJogsRepo(db: FirestoreLike) {
     const now = new Date().toISOString();
 
     const mutations: ((batch: WriteBatchLike) => void)[] = [
-      (batch) => batch.update(jogsCollection().doc(id), { isArchived: true }),
+      (batch) => batch.update(jogsCollection().doc(id), { isArchived: true, isCurrent: false }),
     ];
 
     jogTickets.docs.forEach((doc) => {
@@ -115,7 +136,7 @@ export function createJogsRepo(db: FirestoreLike) {
     await commitInChunks(db, mutations);
   }
 
-  return { ensureDefaultJog, getJogs, createJog, reorderJogs, updateJog, deleteJog, completeJog };
+  return { ensureDefaultJog, getJogs, createJog, reorderJogs, updateJog, deleteJog, completeJog, setCurrentJog };
 }
 
 export type JogsRepo = ReturnType<typeof createJogsRepo>;

@@ -15,6 +15,7 @@ interface JogsContextValue {
   deleteJog: (id: string) => Promise<void>;
   reorderJogs: (orderedIds: string[]) => Promise<void>;
   completeJog: (id: string) => Promise<void>;
+  setCurrentJog: (id: string, current: boolean) => Promise<void>;
 }
 
 const JogsContext = createContext<JogsContextValue | null>(null);
@@ -105,12 +106,36 @@ export function JogsProvider({ children }: { children: ReactNode }) {
       const data = await response.json().catch(() => null);
       throw new Error(data?.error ?? 'Failed to complete jog');
     }
-    setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, isArchived: true } : jog)));
+    setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, isArchived: true, isCurrent: false } : jog)));
+  }, []);
+
+  const setCurrentJog = useCallback(async (id: string, current: boolean) => {
+    const response = await fetch(`/api/jogs/${id}/set-current`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? 'Failed to update current jog');
+    }
+    setJogs((prev) => prev.map((jog) => ({ ...jog, isCurrent: current && jog.id === id })));
   }, []);
 
   return (
     <JogsContext.Provider
-      value={{ jogs, defaultJogId, refresh, createJog, updateJog, updateJogOrder, deleteJog, reorderJogs, completeJog }}
+      value={{
+        jogs,
+        defaultJogId,
+        refresh,
+        createJog,
+        updateJog,
+        updateJogOrder,
+        deleteJog,
+        reorderJogs,
+        completeJog,
+        setCurrentJog,
+      }}
     >
       {children}
     </JogsContext.Provider>

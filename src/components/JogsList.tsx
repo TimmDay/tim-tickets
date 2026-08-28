@@ -21,7 +21,7 @@ interface JogsListProps {
 }
 
 export function JogsList({ ticketCounts }: JogsListProps) {
-  const { jogs, defaultJogId, deleteJog, reorderJogs, updateJogOrder, completeJog } = useJogs();
+  const { jogs, defaultJogId, deleteJog, reorderJogs, updateJogOrder, completeJog, setCurrentJog } = useJogs();
   const [editingJog, setEditingJog] = useState<Jog | null>(null);
   const [deletingJog, setDeletingJog] = useState<Jog | null>(null);
   const [completingJog, setCompletingJog] = useState<Jog | null>(null);
@@ -79,6 +79,14 @@ export function JogsList({ ticketCounts }: JogsListProps) {
     }
   }
 
+  async function handleSetCurrent(jog: Jog, current: boolean) {
+    try {
+      await setCurrentJog(jog.id, current);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to update current jog');
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       {actionError && (
@@ -133,6 +141,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
                       onEdit={() => setEditingJog(jog)}
                       onDelete={() => setDeletingJog(jog)}
                       onComplete={() => setCompletingJog(jog)}
+                      onSetCurrent={(current) => handleSetCurrent(jog, current)}
                     />
                   ))}
                   {displayedJogs.length === 0 && (
@@ -159,6 +168,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
               onEdit={() => setEditingJog(jog)}
               onDelete={() => setDeletingJog(jog)}
               onComplete={() => setCompletingJog(jog)}
+              onSetCurrent={(current) => handleSetCurrent(jog, current)}
             />
           ))}
           {displayedJogs.length === 0 && (
@@ -200,9 +210,10 @@ interface SortableJogRowProps {
   onEdit: () => void;
   onDelete: () => void;
   onComplete: () => void;
+  onSetCurrent: (current: boolean) => void;
 }
 
-function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete }: SortableJogRowProps) {
+function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete, onSetCurrent }: SortableJogRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: jog.id });
 
   return (
@@ -223,15 +234,29 @@ function SortableJogRow({ jog, isDefault, ticketCount, onEdit, onDelete, onCompl
         </button>
       </td>
       <td className="px-3 py-2 font-medium">
-        <Link
-          href={`/?jogId=${jog.id}`}
-          title="View on Current Jog board"
-          className={`hover:underline ${
-            jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
-          }`}
-        >
-          {jog.name}
-        </Link>
+        <div className="flex items-center gap-2">
+          {jog.isArchived || isDefault ? (
+            <span className="w-4" />
+          ) : (
+            <input
+              type="checkbox"
+              checked={jog.isCurrent}
+              onChange={(event) => onSetCurrent(event.target.checked)}
+              title="Set as current jog"
+              aria-label="Set as current jog"
+              className="tt-checkbox"
+            />
+          )}
+          <Link
+            href={`/?jogId=${jog.id}`}
+            title="View on Current Jog board"
+            className={`hover:underline ${
+              jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+            }`}
+          >
+            {jog.name}
+          </Link>
+        </div>
       </td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.startDate ?? '—'}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{jog.endDate ?? '—'}</td>
@@ -285,21 +310,36 @@ interface JogCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onComplete: () => void;
+  onSetCurrent: (current: boolean) => void;
 }
 
-function JogCard({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete }: JogCardProps) {
+function JogCard({ jog, isDefault, ticketCount, onEdit, onDelete, onComplete, onSetCurrent }: JogCardProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-start justify-between gap-2">
-        <Link
-          href={`/?jogId=${jog.id}`}
-          title="View on Current Jog board"
-          className={`text-left text-sm font-medium hover:underline ${
-            jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
-          }`}
-        >
-          {jog.name}
-        </Link>
+        <div className="flex min-w-0 items-center gap-2">
+          {jog.isArchived || isDefault ? (
+            <span className="w-4 shrink-0" />
+          ) : (
+            <input
+              type="checkbox"
+              checked={jog.isCurrent}
+              onChange={(event) => onSetCurrent(event.target.checked)}
+              title="Set as current jog"
+              aria-label="Set as current jog"
+              className="tt-checkbox shrink-0"
+            />
+          )}
+          <Link
+            href={`/?jogId=${jog.id}`}
+            title="View on Current Jog board"
+            className={`truncate text-left text-sm font-medium hover:underline ${
+              jog.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+            }`}
+          >
+            {jog.name}
+          </Link>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"

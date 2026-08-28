@@ -15,8 +15,6 @@ import { JogColumn } from './JogColumn';
 import { TicketModal } from './TicketModal';
 import { ALL_JOGS_ID, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
-const SELECTED_JOG_STORAGE_KEY = 'tt_selected_jog_id';
-
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
   const { epics } = useEpics();
@@ -36,15 +34,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     setTickets(initialTickets);
   }
 
-  // Restore a previously-selected jog once the jogs list is available. A `jogId` (and/or
+  // Resolve the initial jog selection once the jogs list is available. A `jogId` (and/or
   // `epicId`) query param — e.g. from clicking a jog/epic title on the Jogs/Epics pages —
-  // takes priority over whatever was last persisted to localStorage; either way this must
-  // happen post-mount (not during the initial render) since localStorage isn't available
-  // during server rendering and reading it there would cause a hydration mismatch.
-  // `jogs` is now fetched client-side (see JogsContext) so it's genuinely empty for the
-  // first render or two — wait for it to actually populate (always non-empty once loaded,
-  // per `ensureDefaultJog`) before validating a jogId against it and locking this to run-once,
-  // otherwise a real jogId/localStorage entry would always fail validation against `[]`.
+  // takes priority; otherwise default to whichever jog is flagged `isCurrent` (see the Jogs
+  // page), falling back to the first jog if none is. `jogs` is fetched client-side (see
+  // JogsContext) so it's genuinely empty for the first render or two — wait for it to actually
+  // populate (always non-empty once loaded, per `ensureDefaultJog`) before resolving this, and
+  // lock to run-once so it doesn't clobber a selection the user has since changed.
   useEffect(() => {
     if (hasRestoredSelection.current) return;
     if (jogs.length === 0) return;
@@ -53,26 +49,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     const jogIdParam = searchParams.get('jogId');
     const epicIdParam = searchParams.get('epicId');
 
-    let jogIdToApply: string | null = null;
-    if (jogIdParam && (jogIdParam === ALL_JOGS_ID || jogs.some((jog) => jog.id === jogIdParam))) {
-      jogIdToApply = jogIdParam;
-    } else {
-      const stored = localStorage.getItem(SELECTED_JOG_STORAGE_KEY);
-      if (stored) {
-        if (stored === ALL_JOGS_ID || jogs.some((jog) => jog.id === stored)) {
-          jogIdToApply = stored;
-        } else {
-          // The jog this pointed to no longer exists (e.g. deleted since we last saved it) — drop the stale entry.
-          localStorage.removeItem(SELECTED_JOG_STORAGE_KEY);
-        }
-      }
-    }
+    const jogIdToApply =
+      jogIdParam && (jogIdParam === ALL_JOGS_ID || jogs.some((jog) => jog.id === jogIdParam))
+        ? jogIdParam
+        : (jogs.find((jog) => jog.isCurrent)?.id ?? jogs[0]?.id ?? '');
 
-    if (jogIdToApply) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring/applying selection genuinely cannot happen during render without a hydration mismatch
-      setSelectedJogId(jogIdToApply);
-      localStorage.setItem(SELECTED_JOG_STORAGE_KEY, jogIdToApply);
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resolving the initial selection depends on the client-fetched jogs list, so it genuinely cannot happen during render without a hydration mismatch
+    setSelectedJogId(jogIdToApply);
 
     if (epicIdParam) {
       setEpicFilter(epicIdParam);
@@ -85,7 +68,6 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
 
   function handleSelectJog(jogId: string) {
     setSelectedJogId(jogId);
-    localStorage.setItem(SELECTED_JOG_STORAGE_KEY, jogId);
   }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));

@@ -13,7 +13,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ## Pages
 
 ### `/` — Current Jog board
-- Dropdown at the top selects which jog to view (defaults to "Default Jog" or the first jog), or "All tickets" (listed last, below the jogs) to show every ticket unscoped by jog.
+- Dropdown at the top selects which jog to view — defaults to whichever jog is marked "current" on the Jogs page (see below), falling back to the first jog if none is marked — or "All tickets" (listed last, below the jogs) to show every ticket unscoped by jog. This default is a shared, server-side setting, not a per-browser preference.
 - A second dropdown filters the board by epic (All epics / No epic / a specific epic).
 - Clicking a jog's or epic's title on the Jogs/Epics pages navigates here with that filter pre-applied — a jog click selects that jog in the first dropdown; an epic click selects "All tickets" + that epic, via `?jogId=`/`?epicId=` query params consumed once on mount and then stripped from the URL.
 - Five fixed columns: `todo`, `in_progress`, `blocked`, `in_review`, `done`, populated with tickets whose `jogId` matches the selected jog.
@@ -30,6 +30,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 
 ### `/jogs` — Jogs list
 - Table of every jog: name, start date, end date.
+- A checkbox next to each jog's name marks it "current" — the jog the Current Jog board defaults to on load. Only one jog can be current at a time; checking it on one row clears it on whichever jog previously held it (a single batched write server-side). Hidden for archived jogs and for the default jog (also rejected server-side — it's the catch-all backlog, not a jog to actively work "in").
 - Drag rows via a grip handle to reorder (persisted, always active — no competing sort/filter here).
 - Edit icon per row opens the same create/edit modal used for "+ New Jog"; editing only changes the jog's own name/dates, never its ID, so ticket membership (`ticket.jogId`) is untouched.
 - Delete icon per row opens a confirmation modal. The structurally-special "default jog" (earliest-created, guaranteed to always exist) cannot be deleted — its delete icon is disabled. Deleting any other jog reassigns its member tickets to the default jog rather than orphaning them.
@@ -112,7 +113,7 @@ Wherever an epic appears as a chip (ticket cards on the Current Jog board, and i
 
 ## Jog Fields
 
-Name, optional start/end dates, manual `order`, no lifecycle (no start/complete/archive states).
+Name, optional start/end dates, manual `order`. Archived via "Complete" on the Jogs page (see above); a "current" flag independent of that.
 
 ```ts
 interface Jog {
@@ -121,11 +122,15 @@ interface Jog {
   startDate: string | null; // ISO date, optional
   endDate: string | null;   // ISO date, optional
   order: number;
+  isArchived: boolean;      // set by completing a jog (see /jogs above)
+  isCurrent: boolean;       // at most one jog is true at a time; see below
   createdAt: string;
 }
 ```
 
 Start/end dates are set via a small optional date-range picker inside the jog create/edit modal; when set, the range is shown next to the jog selector on the board.
+
+`isCurrent` flags the jog the Current Jog board defaults to on load (set via a checkbox on the Jogs page). Setting it on one jog clears it on any other in the same write; it's also cleared automatically when a jog is completed. The default jog can never be current (rejected server-side, not just hidden in the UI) — it's the catch-all backlog, not a jog someone is actively working.
 
 Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via an `ensureDefaultJog()` check on the jogs-read path — created lazily the first time the `jogs` collection is empty, no manual seed script. It's identified for protection purposes (can't be deleted) by earliest `createdAt`, independent of its display `order`. New tickets default to whichever jog is selected in the creation modal (itself defaulting to "Default Jog").
 

@@ -37,6 +37,7 @@ export interface Jog {
   endDate: string | null;
   order: number;
   isArchived: boolean;
+  isCurrent: boolean;
   createdAt: string;
 }
 

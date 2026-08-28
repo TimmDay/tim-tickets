@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useJogs } from '@/lib/JogsContext';
 import { computeReorder } from '@/lib/ordering';
+import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { ConfirmModal } from './ConfirmModal';
 import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
@@ -26,7 +27,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
   const [completingJog, setCompletingJog] = useState<Jog | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showNewJog, setShowNewJog] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
+  const { showArchived, setShowArchived } = useShowArchived();
   const [filterText, setFilterText] = useState('');
 
   const displayedJogs = useMemo(() => {

@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computeReorder } from '@/lib/ordering';
+import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
@@ -49,7 +50,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
+  const { showArchived, setShowArchived } = useShowArchived();
 
   const jogNameById = useMemo(() => new Map(jogs.map((jog) => [jog.id, jog.name])), [jogs]);
   const epicById = useMemo(() => new Map(epics.map((epic) => [epic.id, epic])), [epics]);

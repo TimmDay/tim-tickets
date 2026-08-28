@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useEpics } from '@/lib/EpicsContext';
+import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { useTapTooltip } from '@/lib/useTapTooltip';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ConfirmModal } from './ConfirmModal';
@@ -27,7 +28,7 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
   const [archivingEpic, setArchivingEpic] = useState<Epic | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showNewEpic, setShowNewEpic] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
+  const { showArchived, setShowArchived } = useShowArchived();
   const [filterText, setFilterText] = useState('');
 
   const displayedEpics = useMemo(() => {

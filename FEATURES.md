@@ -140,6 +140,7 @@ Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via a
 - **Database**: GCP Firestore via `@google-cloud/firestore` (plain GCP, not the Firebase SDK). Credentials via `GCP_PROJECT_ID` / `GCP_CLIENT_EMAIL` / `GCP_PRIVATE_KEY`.
 - Pages are server components doing the initial Firestore read directly; interactive pieces are client components that mutate via API routes and update local state optimistically. No SWR/React Query — dataset is small and single-user.
 - A `JogsContext` provider (mounted once in `layout.tsx`) shares one live jogs list across the board selector, backlog row dropdowns, and the ticket modal, instead of each fetching/duplicating it. An `EpicsContext` provider, mounted alongside it, does the same for epics.
+- A `ShowArchivedContext` provider, mounted alongside them, holds one "show archived" toggle shared by the Current Jog board, Backlog, Jogs, and Epics pages (each previously tracked its own local `showArchived` state) — checking it on one page keeps it checked when you navigate to another.
 
 ## Deployment
 

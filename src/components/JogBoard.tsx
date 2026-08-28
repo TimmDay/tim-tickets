@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computeReorder } from '@/lib/ordering';
+import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
@@ -26,7 +27,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [filterText, setFilterText] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
+  const { showArchived, setShowArchived } = useShowArchived();
   const [epicFilter, setEpicFilter] = useState('all');
   const hasRestoredSelection = useRef(false);
 

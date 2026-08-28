@@ -54,6 +54,10 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Tickets can have comments, added from the edit modal (list at the bottom + an add-comment input, independent of the main Save button).
 - Each ticket card on the board shows an info icon in its top-right corner; hovering it shows a popover with the ticket's comments.
 
+### Back to top button
+- Mobile-only floating button (bottom-right corner), rendered once in the app layout. Appears once you've scrolled past 400px and smooth-scrolls back to the top of the page when clicked.
+- Hidden at `lg` and up, since desktop pages scroll inside their own internal container rather than the window.
+
 ## Ticket Fields
 
 `status` and `jogId` are independent — moving a ticket to a different jog does not change its status. `order` is a single global ranking used both for manual position in the Backlog list and, filtered by status, for position within a kanban column.

@@ -26,7 +26,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Client-side text search (title substring match), filter by jog, filter by epic (All epics / No epic / a specific epic), sort by title / jog / created date (click column header to toggle asc/desc), or drag rows via a grip handle to set a manual order (only active when no search/filter is applied and no column sort is active — dragging while a column sort or filter is active would be ambiguous, so the handle is shown but disabled with an explanatory tooltip in that state).
 - Each row has a jog-reassignment dropdown; selecting "+ New Jog" at the bottom reveals an inline name input to create a jog on the spot (no native browser `prompt()`), plus a "New jog" button next to the filter dropdown that opens the same create/edit modal.
 - Each row has a delete icon (trash, right end) opening a confirmation modal before deleting.
-- Table fills the full remaining viewport height with internal scroll.
+- At `lg` and up, the table fills the full remaining viewport height and scrolls internally; below `lg`, it scrolls with the rest of the page instead (see the full-height layout note below).
 
 ### `/jogs` — Jogs list
 - Table of every jog: name, start date, end date.
@@ -34,7 +34,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Drag rows via a grip handle to reorder (persisted, always active — no competing sort/filter here).
 - Edit icon per row opens the same create/edit modal used for "+ New Jog"; editing only changes the jog's own name/dates, never its ID, so ticket membership (`ticket.jogId`) is untouched.
 - Delete icon per row opens a confirmation modal. The structurally-special "default jog" (earliest-created, guaranteed to always exist) cannot be deleted — its delete icon is disabled. Deleting any other jog reassigns its member tickets to the default jog rather than orphaning them.
-- Table fills the full remaining viewport height with internal scroll.
+- At `lg` and up, the table fills the full remaining viewport height and scrolls internally; below `lg`, it scrolls with the rest of the page instead (see the full-height layout note below).
 
 ### `/epics` — Epics list
 - Table of every epic: name, created date, started date, completed date, ticket count.
@@ -43,7 +43,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
 - Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
 - No manual reorder — epics aren't sequenced like jogs, so the list has no drag handle.
-- Table fills the full remaining viewport height with internal scroll.
+- At `lg` and up, the table fills the full remaining viewport height and scrolls internally; below `lg`, it scrolls with the rest of the page instead (see the full-height layout note below).
 
 ### Global "+ Add" button
 - Lives in the header, visible on all pages.
@@ -150,6 +150,7 @@ Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via a
 - Pages are server components doing the initial Firestore read directly; interactive pieces are client components that mutate via API routes and update local state optimistically. No SWR/React Query — dataset is small and single-user.
 - A `JogsContext` provider (mounted once in `layout.tsx`) shares one live jogs list across the board selector, backlog row dropdowns, and the ticket modal, instead of each fetching/duplicating it. An `EpicsContext` provider, mounted alongside it, does the same for epics.
 - A `ShowArchivedContext` provider, mounted alongside them, holds one "show archived" toggle shared by the Current Jog board, Backlog, Jogs, and Epics pages (each previously tracked its own local `showArchived` state) — checking it on one page keeps it checked when you navigate to another.
+- **Full-height layout**: below `lg`, the app shell isn't clamped to the viewport — the page grows with its content and the window itself scrolls, so nothing on a list/board page should carry its own `overflow-auto`/height clamp there. At `lg` and up, the shell is pinned to the viewport and each page's own scrollable region (a table body, a kanban column's ticket list) takes over — those elements gate the internal-scroll classes behind `lg:` (e.g. `lg:min-h-0 lg:flex-1 lg:overflow-auto`) so exactly one thing scrolls at a time on either breakpoint. Getting this wrong (an unconditional `overflow-auto` below `lg`) creates a second, competing scroll container nested inside the page — double scrollbars and broken swipe/momentum scrolling on mobile.
 
 ## Deployment
 

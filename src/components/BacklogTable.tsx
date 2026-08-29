@@ -197,7 +197,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col lg:h-full">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative">
           <select
@@ -242,7 +242,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
         <FilterInput value={search} onChange={setSearch} placeholder="Filter by title or tag…" />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="lg:min-h-0 lg:flex-1 lg:overflow-auto">
         {/* Desktop: table with drag-reorder */}
         <div className="hidden rounded-lg border border-gray-200 lg:block dark:border-gray-800">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

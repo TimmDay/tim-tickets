@@ -88,7 +88,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col lg:h-full">
       {actionError && (
         <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
           {actionError}
@@ -115,7 +115,7 @@ export function JogsList({ ticketCounts }: JogsListProps) {
         <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter Jogs by title…" />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="lg:min-h-0 lg:flex-1 lg:overflow-auto">
         {/* Desktop: table with drag-reorder */}
         <div className="hidden rounded-lg border border-gray-200 lg:block dark:border-gray-800">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

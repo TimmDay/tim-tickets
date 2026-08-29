@@ -141,16 +141,22 @@ export function createTicketsRepo(db: FirestoreLike) {
   async function updateTicket(id: string, input: UpdateTicketInput): Promise<void> {
     const now = new Date().toISOString();
 
-    // First time any ticket in an epic moves off `todo`, stamp the epic as started.
+    // First time any ticket in an epic moves off `todo`, stamp the epic as started. Only
+    // relevant on the actual `todo` -> other transition, so the ticket is read once up front
+    // and its previous status gates the rest of this — every later transition (e.g.
+    // in_progress -> blocked) skips straight to the plain update below.
     if (input.status && input.status !== 'todo') {
       const ticketRef = ticketsCollection().doc(id);
-      const epicId =
-        input.epicId !== undefined ? input.epicId : ((await ticketRef.get()).data()?.epicId as string | null | undefined);
-      if (epicId) {
-        const epicRef = epicsCollection().doc(epicId);
-        const epicSnap = await epicRef.get();
-        if (epicSnap.exists && !epicSnap.data()?.startedAt) {
-          await epicRef.update({ startedAt: now });
+      const ticketSnap = await ticketRef.get();
+      const ticketData = ticketSnap.data();
+      if (ticketData?.status === 'todo') {
+        const epicId = input.epicId !== undefined ? input.epicId : (ticketData.epicId as string | null | undefined);
+        if (epicId) {
+          const epicRef = epicsCollection().doc(epicId);
+          const epicSnap = await epicRef.get();
+          if (epicSnap.exists && !epicSnap.data()?.startedAt) {
+            await epicRef.update({ startedAt: now });
+          }
         }
       }
     }

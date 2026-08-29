@@ -1,4 +1,3 @@
-import { FieldValue } from '@google-cloud/firestore';
 import { FirestoreLike } from './client';
 
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
@@ -22,21 +21,26 @@ export function createLoginAttemptsRepo(db: FirestoreLike) {
 
   async function recordFailedLogin(ip: string): Promise<void> {
     const ref = loginAttemptsCollection().doc(loginAttemptsDocId(ip));
-    const doc = await ref.get();
     const now = new Date().toISOString();
 
-    if (!doc.exists) {
-      await ref.set({ count: 1, windowStart: now });
-      return;
-    }
+    // Read-modify-write on the counter, so it must run inside a transaction — otherwise two
+    // concurrent failed logins can both read the same starting count and both write the same
+    // incremented value, silently losing an attempt from the rate limit.
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      if (!doc.exists) {
+        tx.set(ref, { count: 1, windowStart: now });
+        return;
+      }
 
-    const data = doc.data()!;
-    const windowAge = Date.now() - new Date(data.windowStart as string).getTime();
-    if (windowAge > LOGIN_RATE_LIMIT_WINDOW_MS) {
-      await ref.set({ count: 1, windowStart: now });
-    } else {
-      await ref.update({ count: FieldValue.increment(1) });
-    }
+      const data = doc.data()!;
+      const windowAge = Date.now() - new Date(data.windowStart as string).getTime();
+      if (windowAge > LOGIN_RATE_LIMIT_WINDOW_MS) {
+        tx.set(ref, { count: 1, windowStart: now });
+      } else {
+        tx.update(ref, { count: ((data.count as number) ?? 0) + 1 });
+      }
+    });
   }
 
   async function clearLoginAttempts(ip: string): Promise<void> {

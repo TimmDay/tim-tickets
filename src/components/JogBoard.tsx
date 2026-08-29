@@ -153,18 +153,24 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     );
 
     if (persist.kind === 'bulk') {
-      await fetch('/api/tickets/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: persist.orderedIds }),
-      });
-      if (statusChanged) {
-        await fetch(`/api/tickets/${activeId}`, {
-          method: 'PATCH',
+      // Reorder and status live on independent fields with no ordering dependency,
+      // so they're persisted concurrently rather than one after the other.
+      await Promise.all([
+        fetch('/api/tickets/reorder', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: targetStatus }),
-        });
-      }
+          body: JSON.stringify({ order: persist.orderedIds }),
+        }),
+        ...(statusChanged
+          ? [
+              fetch(`/api/tickets/${activeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: targetStatus }),
+              }),
+            ]
+          : []),
+      ]);
     } else {
       await fetch(`/api/tickets/${activeId}`, {
         method: 'PATCH',

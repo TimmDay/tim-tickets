@@ -1,4 +1,28 @@
-import { ORDER_GAP } from './types';
+import { ORDER_GAP, Priority } from './types';
+
+const PRIORITY_RANK: Record<Priority | 'none', number> = { high: 0, medium: 1, none: 2, low: 3 };
+
+/**
+ * Re-sorts a set of tickets by priority (high, medium, none, low — stable within each group,
+ * by current `order`) by permuting the `order` values they already hold rather than
+ * renumbering from zero. `order` is one global ranking, so a subset (e.g. just the tickets
+ * visible on the board) must stay in the same slots relative to every ticket outside it.
+ * Returns id -> new order, only for tickets whose order actually changed.
+ */
+export function computePrioritySort<T extends { id: string; order: number; priority: Priority | null }>(
+  tickets: T[],
+): Map<string, number> {
+  const byOrder = [...tickets].sort((a, b) => a.order - b.order);
+  const slots = byOrder.map((t) => t.order);
+  const byPriority = [...byOrder].sort(
+    (a, b) => PRIORITY_RANK[a.priority ?? 'none'] - PRIORITY_RANK[b.priority ?? 'none'],
+  );
+  const updates = new Map<string, number>();
+  byPriority.forEach((ticket, index) => {
+    if (ticket.order !== slots[index]) updates.set(ticket.id, slots[index]);
+  });
+  return updates;
+}
 
 function computeOrderBetween(before: number | null, after: number | null): number {
   if (before === null && after === null) return 0;

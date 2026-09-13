@@ -138,6 +138,16 @@ export function createTicketsRepo(db: FirestoreLike) {
     );
   }
 
+  /** Sets explicit `order` values, for reorders that permute existing slots (e.g. the board's
+   * sort-by-priority) rather than renumbering a full list like `reorderTickets` does. */
+  async function setTicketOrders(updates: { id: string; order: number }[]): Promise<void> {
+    const now = new Date().toISOString();
+    await commitInChunks(
+      db,
+      updates.map(({ id, order }) => (batch) => batch.update(ticketsCollection().doc(id), { order, updatedAt: now })),
+    );
+  }
+
   async function updateTicket(id: string, input: UpdateTicketInput): Promise<void> {
     const now = new Date().toISOString();
 
@@ -191,6 +201,7 @@ export function createTicketsRepo(db: FirestoreLike) {
     getTicketByKey,
     createTicket,
     reorderTickets,
+    setTicketOrders,
     updateTicket,
     deleteTicket,
     addComment,

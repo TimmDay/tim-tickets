@@ -6,7 +6,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
-import { computeReorder } from '@/lib/ordering';
+import { computePrioritySort, computeReorder } from '@/lib/ordering';
 import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
@@ -174,6 +174,23 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     }
   }
 
+  // Sorts each column's currently visible tickets by priority, per column so tickets only swap
+  // order slots with their own column-mates.
+  async function handleSortByPriority() {
+    const updates = new Map<string, number>();
+    for (const status of STATUSES) {
+      computePrioritySort(ticketsByStatus[status.value]).forEach((order, id) => updates.set(id, order));
+    }
+    if (updates.size === 0) return;
+
+    setTickets((prev) => prev.map((t) => (updates.has(t.id) ? { ...t, order: updates.get(t.id)! } : t)));
+    await fetch('/api/tickets/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orders: [...updates].map(([id, order]) => ({ id, order })) }),
+    });
+  }
+
   function handleSaved(ticket: Ticket) {
     setTickets((prev) =>
       prev.some((t) => t.id === ticket.id) ? prev.map((t) => (t.id === ticket.id ? ticket : t)) : [...prev, ticket],
@@ -216,6 +233,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           </select>
           <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         </div>
+        <button
+          type="button"
+          onClick={handleSortByPriority}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+        >
+          Sort by priority
+        </button>
         <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
           <input
             type="checkbox"

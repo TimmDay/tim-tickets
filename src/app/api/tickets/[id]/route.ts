@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { ticketsRepo } from '@/lib/repos';
+import { AGENT_MODEL_VALUES } from '@/lib/types';
 
 const updateTicketSchema = z.object({
   title: z.string().trim().min(1).optional(),
@@ -11,6 +12,7 @@ const updateTicketSchema = z.object({
   priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
   dueDate: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
+  agentModel: z.enum(AGENT_MODEL_VALUES).nullable().optional(),
   order: z.number().optional(),
   isArchived: z.boolean().optional(),
 });

@@ -2,6 +2,17 @@ export type TicketStatus = 'todo' | 'in_progress' | 'blocked' | 'in_review' | 'd
 
 export type Priority = 'low' | 'medium' | 'high';
 
+export const AGENT_MODEL_VALUES = ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'] as const;
+
+/** Claude model an agent run ("Release the bots") uses for a ticket. */
+export type AgentModel = (typeof AGENT_MODEL_VALUES)[number];
+
+export const AGENT_MODELS: { value: AgentModel; label: string }[] = [
+  { value: 'claude-opus-5', label: 'Opus 5' },
+  { value: 'claude-sonnet-5', label: 'Sonnet 5' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+];
+
 export interface Comment {
   id: string;
   body: string;
@@ -23,6 +34,11 @@ export interface Ticket {
   priority: Priority | null;
   dueDate: string | null;
   tags: string[];
+  /** Model for agent runs on this ticket; null means the workflow's default. */
+  agentModel: AgentModel | null;
+  /** ISO; set when an agent run is dispatched for this ticket, cleared when the agent reports
+   * back. Tickets with it set are skipped by later "Release the bots" runs. */
+  agentDispatchedAt: string | null;
   comments: Comment[];
   order: number;
   isArchived: boolean;
@@ -50,6 +66,9 @@ export interface Epic {
   name: string;
   description: string;
   colorTheme: EpicColorTheme;
+  /** Normalized `https://github.com/owner/name` URL of the repo this epic's work lives in, so
+   * agents triggered for its tickets know where to act. */
+  repoUrl: string | null;
   isArchived: boolean;
   startedAt: string | null;
   completedAt: string | null;

@@ -3,7 +3,8 @@ import { SESSION_COOKIE_NAME, isValidSessionToken } from '@/lib/auth';
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|api/auth/login|.*\\.(?:png|ico|webmanifest|json|svg)$).*)',
+    // api/agent/ is called by agent workflows with a bearer token, checked in the route itself.
+    '/((?!_next/static|_next/image|api/auth/login|api/agent/|.*\\.(?:png|ico|webmanifest|json|svg)$).*)',
   ],
 };
 

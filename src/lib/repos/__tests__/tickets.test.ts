@@ -47,3 +47,38 @@ describe('ticketsRepo.updateTicket', () => {
     expect(epicBAfter.data()?.startedAt).toBe(epicBBefore.data()?.startedAt);
   });
 });
+
+describe('ticketsRepo.applyAgentReport', () => {
+  it('moves the ticket to in_review, comments the PR link and clears the dispatch stamp when a PR is opened', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await db.collection('tickets').doc('t1').update({ status: 'in_progress', agentDispatchedAt: '2026-09-01T00:00:00.000Z' });
+
+    expect(await repo.applyAgentReport('T-1', { outcome: 'pr_opened', prUrl: 'https://github.com/o/r/pull/7' })).toBe(true);
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('in_review');
+    expect(t1.agentDispatchedAt).toBeNull();
+    expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 Agent opened a PR: https://github.com/o/r/pull/7' })]);
+  });
+
+  it('leaves status alone but still comments and clears the stamp on a failed run', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await db.collection('tickets').doc('t1').update({ status: 'in_progress', agentDispatchedAt: '2026-09-01T00:00:00.000Z' });
+
+    await repo.applyAgentReport('T-1', { outcome: 'failed', runUrl: 'https://github.com/o/r/actions/runs/1' });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('in_progress');
+    expect(t1.agentDispatchedAt).toBeNull();
+    expect(t1.comments).toEqual([
+      expect.objectContaining({ body: '🤖 Agent run failed: https://github.com/o/r/actions/runs/1' }),
+    ]);
+  });
+
+  it('returns false for an unknown key', async () => {
+    const repo = createTicketsRepo(createFakeFirestore(seedFirestore()));
+    expect(await repo.applyAgentReport('T-999', { outcome: 'no_changes' })).toBe(false);
+  });
+});

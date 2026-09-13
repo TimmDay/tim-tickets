@@ -5,6 +5,7 @@ import { EpicColorThemeSelect } from './EpicColorThemeSelect';
 import { XIcon } from './XIcon';
 import { useEpics } from '@/lib/EpicsContext';
 import { useNewEpicDraft } from '@/lib/formDrafts';
+import { parseGithubRepoUrl } from '@/lib/github';
 import { DEFAULT_EPIC_COLOR_THEME, Epic } from '@/lib/types';
 
 interface EpicModalProps {
@@ -22,12 +23,14 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
   const [name, setName] = useState(epic?.name ?? draft?.name ?? '');
   const [description, setDescription] = useState(epic?.description ?? draft?.description ?? '');
   const [colorTheme, setColorTheme] = useState(epic?.colorTheme ?? draft?.colorTheme ?? DEFAULT_EPIC_COLOR_THEME);
+  const [repoUrl, setRepoUrl] = useState(epic?.repoUrl ?? draft?.repoUrl ?? '');
   const [saving, setSaving] = useState(false);
+  const repoUrlInvalid = Boolean(repoUrl.trim()) && !parseGithubRepoUrl(repoUrl);
 
   useEffect(() => {
     if (isEditing) return;
-    setDraft({ name, description, colorTheme });
-  }, [isEditing, name, description, colorTheme, setDraft]);
+    setDraft({ name, description, colorTheme, repoUrl });
+  }, [isEditing, name, description, colorTheme, repoUrl, setDraft]);
 
   function handleCancel() {
     clearDraft();
@@ -36,14 +39,15 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
 
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || repoUrlInvalid) return;
     setSaving(true);
+    const repoUrlValue = repoUrl.trim() || null;
     try {
       if (isEditing) {
-        await updateEpic(epic!.id, name.trim(), description, colorTheme);
+        await updateEpic(epic!.id, name.trim(), description, colorTheme, repoUrlValue);
         onSaved(epic!.id);
       } else {
-        const created = await createEpic(name.trim(), description, colorTheme);
+        const created = await createEpic(name.trim(), description, colorTheme, repoUrlValue);
         clearDraft();
         onSaved(created.id);
       }
@@ -98,6 +102,20 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
             <EpicColorThemeSelect value={colorTheme} onChange={setColorTheme} />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">GitHub repo</label>
+            <input
+              value={repoUrl}
+              onChange={(event) => setRepoUrl(event.target.value)}
+              placeholder="Optional — https://github.com/owner/repo"
+              aria-invalid={repoUrlInvalid}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            />
+            {repoUrlInvalid && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">Must be a GitHub repo URL, e.g. https://github.com/owner/repo</p>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -108,7 +126,7 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
             </button>
             <button
               type="submit"
-              disabled={saving || !name.trim()}
+              disabled={saving || !name.trim() || repoUrlInvalid}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
             >
               {saving ? 'Saving…' : isEditing ? 'Save' : 'Create'}

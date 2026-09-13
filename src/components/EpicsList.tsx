@@ -9,6 +9,7 @@ import { ArchiveIcon } from './ArchiveIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { EpicModal } from './EpicModal';
 import { FilterInput } from './FilterInput';
+import { LinkIcon } from './LinkIcon';
 import { PencilIcon } from './PencilIcon';
 import { TrashIcon } from './TrashIcon';
 import { ALL_JOGS_ID, Epic, getEpicColorTheme } from '@/lib/types';
@@ -190,6 +191,7 @@ function EpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProp
           <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEpicColorTheme(epic.colorTheme).dotClassName}`} />
           {epic.name}
         </Link>
+        {epic.repoUrl && <EpicRepoLink repoUrl={epic.repoUrl} className="ml-2 align-middle" />}
       </td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.startedAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.completedAt)}</td>
@@ -258,6 +260,7 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
             <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${getEpicColorTheme(epic.colorTheme).dotClassName}`} />
             {epic.name}
           </Link>
+          {epic.repoUrl && <EpicRepoLink repoUrl={epic.repoUrl} />}
           {epic.description && (
             <span
               ref={descriptionRef}
@@ -322,5 +325,20 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
         </button>
       </div>
     </div>
+  );
+}
+
+function EpicRepoLink({ repoUrl, className = '' }: { repoUrl: string; className?: string }) {
+  return (
+    <a
+      href={repoUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={repoUrl.replace('https://github.com/', '')}
+      aria-label="Open GitHub repo"
+      className={`inline-flex shrink-0 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 ${className}`}
+    >
+      <LinkIcon className="h-3.5 w-3.5" />
+    </a>
   );
 }

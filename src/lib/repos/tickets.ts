@@ -1,5 +1,6 @@
 import { FieldValue } from '@google-cloud/firestore';
-import { Comment, ORDER_GAP, Priority, Ticket, TicketStatus } from '../types';
+import { AGENT_COMMENT_PREFIX } from '../agentRuns';
+import { AgentModel, Comment, ORDER_GAP, Priority, Ticket, TicketStatus } from '../types';
 import { commitInChunks, DocSnapshotLike, FirestoreLike } from './client';
 
 function toTicket(doc: DocSnapshotLike): Ticket {
@@ -15,6 +16,8 @@ function toTicket(doc: DocSnapshotLike): Ticket {
     priority: (data.priority as Priority | null) ?? null,
     dueDate: (data.dueDate as string | null) ?? null,
     tags: (data.tags as string[]) ?? [],
+    agentModel: (data.agentModel as AgentModel | null) ?? null,
+    agentDispatchedAt: (data.agentDispatchedAt as string | null) ?? null,
     comments: (data.comments as Comment[]) ?? [],
     order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
     isArchived: (data.isArchived as boolean) ?? false,
@@ -31,6 +34,7 @@ export interface CreateTicketInput {
   priority: Priority | null;
   dueDate: string | null;
   tags: string[];
+  agentModel: AgentModel | null;
 }
 
 export interface UpdateTicketInput {
@@ -42,9 +46,15 @@ export interface UpdateTicketInput {
   priority?: Priority | null;
   dueDate?: string | null;
   tags?: string[];
+  agentModel?: AgentModel | null;
+  agentDispatchedAt?: string | null;
   order?: number;
   isArchived?: boolean;
 }
+
+export type AgentReport =
+  | { outcome: 'pr_opened'; prUrl: string }
+  | { outcome: 'no_changes' | 'failed'; runUrl?: string };
 
 export function createTicketsRepo(db: FirestoreLike) {
   const ticketsCollection = () => db.collection('tickets');
@@ -115,6 +125,8 @@ export function createTicketsRepo(db: FirestoreLike) {
       priority: input.priority,
       dueDate: input.dueDate,
       tags: input.tags,
+      agentModel: input.agentModel,
+      agentDispatchedAt: null,
       comments: [] as Comment[],
       order: Date.now(),
       isArchived: false,
@@ -135,6 +147,16 @@ export function createTicketsRepo(db: FirestoreLike) {
         (id, index) => (batch) =>
           batch.update(ticketsCollection().doc(id), { order: index * ORDER_GAP, updatedAt: now }),
       ),
+    );
+  }
+
+  /** Sets explicit `order` values, for reorders that permute existing slots (e.g. the board's
+   * sort-by-priority) rather than renumbering a full list like `reorderTickets` does. */
+  async function setTicketOrders(updates: { id: string; order: number }[]): Promise<void> {
+    const now = new Date().toISOString();
+    await commitInChunks(
+      db,
+      updates.map(({ id, order }) => (batch) => batch.update(ticketsCollection().doc(id), { order, updatedAt: now })),
     );
   }
 
@@ -164,6 +186,37 @@ export function createTicketsRepo(db: FirestoreLike) {
     await ticketsCollection()
       .doc(id)
       .update({ ...input, updatedAt: now });
+  }
+
+  /** Applies an agent workflow's report: a PR moves the ticket to in_review; every outcome
+   * comments and clears `agentDispatchedAt` so the ticket can be dispatched again. One
+   * transaction, so the status, stamp and comment land together. Returns false if no ticket
+   * has that key. */
+  async function applyAgentReport(key: string, report: AgentReport): Promise<boolean> {
+    const snapshot = await ticketsCollection().where('key', '==', key).limit(1).get();
+    if (snapshot.empty) return false;
+    const ref = ticketsCollection().doc(snapshot.docs[0].id);
+
+    const now = new Date().toISOString();
+    const body =
+      report.outcome === 'pr_opened'
+        ? `${AGENT_COMMENT_PREFIX} Agent opened a PR: ${report.prUrl}`
+        : `${AGENT_COMMENT_PREFIX} Agent ${report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed'}${
+            report.runUrl ? `: ${report.runUrl}` : ''
+          }`;
+    const comment: Comment = { id: crypto.randomUUID(), body, createdAt: now };
+
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      const comments = (doc.data()?.comments as Comment[]) ?? [];
+      tx.update(ref, {
+        ...(report.outcome === 'pr_opened' ? { status: 'in_review' } : {}),
+        agentDispatchedAt: null,
+        comments: [...comments, comment],
+        updatedAt: now,
+      });
+    });
+    return true;
   }
 
   async function deleteTicket(id: string): Promise<void> {
@@ -197,7 +250,9 @@ export function createTicketsRepo(db: FirestoreLike) {
     getTicketByKey,
     createTicket,
     reorderTickets,
+    setTicketOrders,
     updateTicket,
+    applyAgentReport,
     deleteTicket,
     addComment,
     deleteComment,

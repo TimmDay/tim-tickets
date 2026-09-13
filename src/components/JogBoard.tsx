@@ -6,12 +6,13 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
-import { computeReorder } from '@/lib/ordering';
+import { computePrioritySort, computeReorder } from '@/lib/ordering';
 import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
+import { ReleaseBotsModal } from './ReleaseBotsModal';
 import { TicketModal } from './TicketModal';
 import { ALL_JOGS_ID, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
@@ -24,6 +25,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [releasingBots, setReleasingBots] = useState(false);
   const [filterText, setFilterText] = useState('');
   const { showArchived, setShowArchived } = useShowArchived();
   const [epicFilter, setEpicFilter] = useState('all');
@@ -180,6 +182,23 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     }
   }
 
+  // Sorts each column's currently visible tickets by priority, per column so tickets only swap
+  // order slots with their own column-mates.
+  async function handleSortByPriority() {
+    const updates = new Map<string, number>();
+    for (const status of STATUSES) {
+      computePrioritySort(ticketsByStatus[status.value]).forEach((order, id) => updates.set(id, order));
+    }
+    if (updates.size === 0) return;
+
+    setTickets((prev) => prev.map((t) => (updates.has(t.id) ? { ...t, order: updates.get(t.id)! } : t)));
+    await fetch('/api/tickets/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orders: [...updates].map(([id, order]) => ({ id, order })) }),
+    });
+  }
+
   function handleSaved(ticket: Ticket) {
     setTickets((prev) =>
       prev.some((t) => t.id === ticket.id) ? prev.map((t) => (t.id === ticket.id ? ticket : t)) : [...prev, ticket],
@@ -196,7 +215,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
         <JogSelect
           value={effectiveJogId}
           onChange={handleSelectJog}
-          className="w-64"
+          className="w-64 lg:w-48"
           includeArchived={showArchived}
           includeAllOption
         />
@@ -206,11 +225,11 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
             <span>{selectedJog.endDate ?? '…'}</span>
           </div>
         )}
-        <div className="relative">
+        <div className="relative lg:w-40">
           <select
             value={epicFilter}
             onChange={(event) => setEpicFilter(event.target.value)}
-            className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            className="w-full appearance-none truncate rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
             <option value="all">All epics</option>
             <option value="none">No epic</option>
@@ -222,6 +241,20 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           </select>
           <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         </div>
+        <button
+          type="button"
+          onClick={handleSortByPriority}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+        >
+          Prioritise
+        </button>
+        <button
+          type="button"
+          onClick={() => setReleasingBots(true)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+        >
+          EHH OII
+        </button>
         <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
           <input
             type="checkbox"
@@ -231,7 +264,12 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           />
           Show archived
         </label>
-        <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter by title or tag…" />
+        <FilterInput
+          value={filterText}
+          onChange={setFilterText}
+          placeholder="Filter by title or tag…"
+          desktopWidthClassName="lg:w-44"
+        />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -249,6 +287,17 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           </div>
         </div>
       </DndContext>
+
+      {releasingBots && (
+        <ReleaseBotsModal
+          jogId={effectiveJogId}
+          tickets={tickets}
+          epics={epics}
+          onClose={() => setReleasingBots(false)}
+          // Dispatch moves tickets and adds comments server-side — refetch to show that.
+          onDispatched={() => router.refresh()}
+        />
+      )}
 
       {editingTicket && (
         <TicketModal

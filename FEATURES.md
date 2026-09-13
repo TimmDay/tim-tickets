@@ -18,6 +18,8 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Clicking a jog's or epic's title on the Jogs/Epics pages navigates here with that filter pre-applied — a jog click selects that jog in the first dropdown; an epic click selects "All tickets" + that epic, via `?jogId=`/`?epicId=` query params consumed once on mount and then stripped from the URL.
 - Five fixed columns: `todo`, `in_progress`, `blocked`, `in_review`, `done`, populated with tickets whose `jogId` matches the selected jog.
 - Cards are draggable both across columns (updates `status`) and within a column (reorders `order`), via `@dnd-kit/sortable`'s multi-container pattern.
+- A "Sort by priority" button reorders each column's currently visible tickets (respecting jog/epic/text filters): high, then medium, then no priority, then low, stable within each group. It's a one-shot, persisted reorder — it permutes the `order` values those tickets already hold, so their position relative to hidden tickets is unchanged, and manual dragging still works afterwards.
+- On a collapsed column, tapping anywhere on its header expands it (not just the chevron).
 - Clicking a card opens it in the edit modal (includes Delete, and a Comments section — see below).
 - Columns fill the full remaining viewport height; each column's ticket list scrolls internally rather than growing the page.
 
@@ -39,7 +41,8 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ### `/epics` — Epics list
 - Table of every epic: name, created date, started date, completed date, ticket count.
 - Clicking an epic's name navigates to the Current Jog board with the jog dropdown set to "All tickets" and the epic filter set to this epic (see below).
-- Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing only changes the epic's name.
+- Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing changes the epic's name, description, color, and GitHub repo.
+- An epic can have an optional **GitHub repo** URL (validated as `github.com/owner/repo`, stored normalized). When set, a link icon next to the epic's name opens the repo. This is the repo that agents triggered for the epic's tickets act on (see "Release the bots").
 - Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
 - Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
 - No manual reorder — epics aren't sequenced like jogs, so the list has no drag handle.
@@ -48,12 +51,20 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ### Global "+ Add" button
 - Lives in the header, visible on all pages.
 - Opens a ticket-creation modal, reused for editing existing tickets.
-- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date.
+- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date, agent model (Default / Opus 5 / Sonnet 5 / Haiku 4.5 — the Claude model used when an agent works this ticket; see "Release the bots").
 - Clicking outside the modal (the backdrop) closes it, same as Cancel.
 
 ### Comments
 - Tickets can have comments, added from the edit modal (list at the bottom + an add-comment input, independent of the main Save button).
 - Each ticket card on the board shows an info icon in its top-right corner; hovering it shows a popover with the ticket's comments.
+
+### Release the bots (agent runs)
+- A "🤖 Release the bots" button on the Current Jog board opens a confirm dialog listing eligible tickets in the jog selected in the dropdown (every ticket for "All tickets"; epic/text filters are ignored). A ticket is eligible if it's `todo` or `in_progress`, not archived, tagged `dev` (case-insensitive), and in a non-archived epic with a valid GitHub repo.
+- Tickets that already have a run in flight (`agentDispatchedAt` set) are skipped by default. A checkbox in the dialog re-dispatches them too.
+- Confirming calls `POST /api/agent-runs`, which sends a GitHub `repository_dispatch` (`event_type: tim-tickets-agent`) to each ticket's epic repo. The payload carries the ticket key, title, body, `agentModel`, the epic's name and description, the ticket's comments (oldest first, skipping the app's own 🤖 status comments, oldest trimmed past ~20k chars), and the report-back URL. Each dispatched ticket is stamped with `agentDispatchedAt`, moved from `todo` to `in_progress`, and gets a "🤖 Agent dispatched…" comment. The dialog shows per-ticket failures (e.g. the token can't see the repo).
+- Each repo runs the workflow in `docs/agent-workflow.yml`. Claude Code (via `anthropics/claude-code-action`, subscription OAuth token, the ticket's model) commits on an `agent/T-xx-<run>` branch, the workflow opens the PR, then reports back.
+- Report-back: `POST /api/agent/tickets/:key/report` with `Authorization: Bearer $AGENT_API_TOKEN` (exempt from the session-cookie gate; this is the only thing that token can do). `{outcome: 'pr_opened', prUrl}` comments the PR link and moves the ticket to `in_review`. `{outcome: 'no_changes' | 'failed', runUrl?}` just comments. All outcomes clear `agentDispatchedAt`.
+- Env: `GITHUB_DISPATCH_TOKEN` (fine-grained PAT, Contents: read & write on the epic repos) and `AGENT_API_TOKEN`. Report-back needs the app to be reachable from GitHub: dispatch from the deployed app, or set `AGENT_REPORT_BASE_URL` (e.g. a tunnel URL) when dispatching from local dev. Preview deployments behind Vercel Authentication also need the optional `VERCEL_PROTECTION_BYPASS` repo secret, which the workflow sends as `x-vercel-protection-bypass`. Secret expiry, rotation and troubleshooting: `docs/agent-secrets.md`.
 
 ### Back to top button
 - Mobile-only floating button (bottom-right corner), rendered once in the app layout. Appears once you've scrolled past 400px and smooth-scrolls back to the top of the page when clicked.
@@ -83,6 +94,8 @@ interface Ticket {
   priority: Priority;
   dueDate: string | null;  // ISO date
   tags: string[];
+  agentModel: 'claude-opus-5' | 'claude-sonnet-5' | 'claude-haiku-4-5-20251001' | null; // null = workflow default
+  agentDispatchedAt: string | null; // ISO; set while an agent run is in flight
   comments: Comment[];
   order: number;           // manual/backlog + per-column kanban ordering
   createdAt: string;       // ISO
@@ -102,6 +115,7 @@ interface Epic {
   name: string;
   description: string;        // optional; shown as a tooltip on the epic chip
   colorTheme: EpicColorTheme; // chosen in the epic create/edit modal; defaults to 'indigo'
+  repoUrl: string | null;     // optional GitHub repo, normalized to https://github.com/owner/name
   isArchived: boolean;
   startedAt: string | null;   // ISO; auto-set once, first ticket to leave `todo`
   completedAt: string | null; // ISO; set when the epic is archived

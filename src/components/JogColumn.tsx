@@ -38,10 +38,19 @@ export function JogColumn({ status, label, tickets, onSelectTicket }: JogColumnP
         collapsed ? 'lg:self-start' : 'lg:h-full'
       } ${isOver ? 'bg-gray-100 ring-2 ring-gray-300 dark:bg-gray-800 dark:ring-gray-600' : ''}`}
     >
-      <div className="flex shrink-0 items-center gap-1.5 px-1 py-1">
+      {/* While collapsed, the whole header is a tap target for expanding — the chevron alone is
+          a small target on mobile. The chevron stops propagation so a tap on it doesn't toggle
+          twice. Keyboard users still have the chevron button itself. */}
+      <div
+        onClick={collapsed ? () => setCollapsed(false) : undefined}
+        className={`flex shrink-0 items-center gap-1.5 px-1 py-1 ${collapsed ? 'cursor-pointer' : ''}`}
+      >
         <button
           type="button"
-          onClick={() => setCollapsed((prev) => !prev)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setCollapsed((prev) => !prev);
+          }}
           aria-label={collapsed ? 'Expand column' : 'Collapse column'}
           aria-expanded={!collapsed}
           className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"

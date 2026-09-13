@@ -13,6 +13,9 @@ export const AGENT_MODELS: { value: AgentModel; label: string }[] = [
   { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
 ];
 
+/** Model preselected for new tickets in the Agent model dropdown. */
+export const DEFAULT_AGENT_MODEL: AgentModel = 'claude-haiku-4-5-20251001';
+
 export interface Comment {
   id: string;
   body: string;
@@ -137,7 +140,7 @@ export const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 'high', label: 'High' },
 ];
 
-export const BASE_TAGS = ['Life-admin', 'Travel', 'Learn', 'Fun', 'Career', 'Social', 'Dev', 'Fitness', 'EH OI'];
+export const BASE_TAGS = ['Dev', 'EH OI', 'Life admin', 'Career', 'Travel', 'Fun', 'Fitness', 'Social'];
 
 export const DEFAULT_JOG_NAME = 'backlog';
 

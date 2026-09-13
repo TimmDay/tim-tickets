@@ -11,11 +11,13 @@ import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { useJogs } from '@/lib/JogsContext';
 import { useNewTicketDraft } from '@/lib/formDrafts';
+import { hasAgentTag } from '@/lib/agentRuns';
 import {
   AGENT_MODELS,
   AgentModel,
   BASE_TAGS,
   Comment,
+  DEFAULT_AGENT_MODEL,
   PRIORITIES,
   Priority,
   STATUSES,
@@ -47,7 +49,9 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? 'todo');
   const [dueDate, setDueDate] = useState(ticket?.dueDate ?? draft?.dueDate ?? '');
   const [tags, setTags] = useState<string[]>(ticket?.tags ?? draft?.tags ?? []);
-  const [agentModel, setAgentModel] = useState<AgentModel | null>(ticket?.agentModel ?? draft?.agentModel ?? null);
+  const [agentModel, setAgentModel] = useState<AgentModel | null>(
+    ticket?.agentModel ?? draft?.agentModel ?? DEFAULT_AGENT_MODEL,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -347,26 +351,30 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 />
               </div>
 
-              <div className="order-6 col-span-3 lg:order-6 lg:col-span-1">
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Agent model</label>
-                <div className="relative">
-                  <select
-                    value={agentModel ?? ''}
-                    onChange={(event) =>
-                      setAgentModel(event.target.value === '' ? null : (event.target.value as AgentModel))
-                    }
-                    className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                  >
-                    <option value="">Default</option>
-                    {AGENT_MODELS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              {hasAgentTag(tags) && (
+                <div className="order-6 col-span-3 lg:order-6 lg:col-span-1">
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Agent model
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={agentModel ?? ''}
+                      onChange={(event) =>
+                        setAgentModel(event.target.value === '' ? null : (event.target.value as AgentModel))
+                      }
+                      className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    >
+                      <option value="">Default</option>
+                      {AGENT_MODELS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { AGENT_COMMENT_PREFIX, AGENT_DISPATCH_EVENT_TYPE, formatCommentsForAgent, selectAgentRunCandidates } from '@/lib/agentRuns';
+import {
+  AGENT_COMMENT_PREFIX,
+  AGENT_DISPATCH_EVENT_TYPE,
+  formatCommentsForAgent,
+  resolveReportBaseUrl,
+  selectAgentRunCandidates,
+} from '@/lib/agentRuns';
 import { toGithubRepoUrl } from '@/lib/github';
 import { sendRepositoryDispatch } from '@/lib/githubDispatch';
 import { epicsRepo, ticketsRepo } from '@/lib/repos';
@@ -26,9 +32,14 @@ export async function POST(request: Request) {
     ? [...selection.eligible, ...selection.alreadyDispatched]
     : selection.eligible;
 
-  // The agent's workflow posts its result back here, so it must be reachable from GitHub —
-  // i.e. the deployed app, not localhost.
-  const reportBaseUrl = new URL(request.url).origin;
+  // The agent's workflow posts its result back here, so it must be reachable from GitHub — the
+  // deployed app, or AGENT_REPORT_BASE_URL (e.g. a tunnel) when dispatching from local dev.
+  let reportBaseUrl: string;
+  try {
+    reportBaseUrl = resolveReportBaseUrl(request.url, process.env.AGENT_REPORT_BASE_URL);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
 
   const results = await Promise.all(
     candidates.map(async ({ ticket, epic, repo }) => {

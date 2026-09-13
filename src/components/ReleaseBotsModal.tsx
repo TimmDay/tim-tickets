@@ -38,12 +38,15 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jogId, includeDispatched }),
       });
-      if (!response.ok) throw new Error();
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(typeof data?.error === 'string' ? data.error : undefined);
+      }
       const data: DispatchResult = await response.json();
       setResult(data);
       if (data.dispatched.length > 0) onDispatched();
-    } catch {
-      setError('Something went wrong dispatching agents.');
+    } catch (err) {
+      setError((err instanceof Error && err.message) || 'Something went wrong dispatching agents.');
     } finally {
       setSending(false);
     }

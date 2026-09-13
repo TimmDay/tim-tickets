@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCommentsForAgent, selectAgentRunCandidates } from '../agentRuns';
+import { formatCommentsForAgent, resolveReportBaseUrl, selectAgentRunCandidates } from '../agentRuns';
 import { ALL_JOGS_ID, Epic, Ticket } from '../types';
 
 const epic = (overrides: Partial<Epic>): Epic => ({
@@ -92,5 +92,23 @@ describe('formatCommentsForAgent', () => {
       comment(`new ${long}`, '2026-09-02T00:00:00.000Z'),
     ]);
     expect(result.startsWith('(1 older comment omitted)\n- (2026-09-02) new ')).toBe(true);
+  });
+});
+
+describe('resolveReportBaseUrl', () => {
+  const requestUrl = 'http://localhost:3000/api/agent-runs';
+
+  it('uses the request origin when no override is set', () => {
+    expect(resolveReportBaseUrl(requestUrl, undefined)).toBe('http://localhost:3000');
+    expect(resolveReportBaseUrl(requestUrl, '  ')).toBe('http://localhost:3000');
+  });
+
+  it('prefers the override, reduced to its origin', () => {
+    expect(resolveReportBaseUrl(requestUrl, 'https://abc.trycloudflare.com/')).toBe('https://abc.trycloudflare.com');
+  });
+
+  it('rejects an override that is not an http(s) URL', () => {
+    expect(() => resolveReportBaseUrl(requestUrl, 'abc.trycloudflare.com')).toThrow('AGENT_REPORT_BASE_URL');
+    expect(() => resolveReportBaseUrl(requestUrl, 'ftp://example.com')).toThrow('must be http(s)');
   });
 });

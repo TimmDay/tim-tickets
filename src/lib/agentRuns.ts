@@ -32,6 +32,27 @@ export function formatCommentsForAgent(comments: Comment[]): string {
   return lines.join('\n');
 }
 
+/**
+ * Base URL agent workflows report back to. Normally the origin the button was pressed on (the
+ * deployed app), but `override` (the AGENT_REPORT_BASE_URL env var) wins when set, e.g. a
+ * tunnel URL while dispatching from local dev, where the request origin is localhost and so
+ * unreachable from GitHub. Throws on an override that isn't an http(s) URL, so a typo fails the
+ * whole run up front rather than every workflow failing at its final step.
+ */
+export function resolveReportBaseUrl(requestUrl: string, override: string | undefined): string {
+  if (!override?.trim()) return new URL(requestUrl).origin;
+  let url: URL;
+  try {
+    url = new URL(override.trim());
+  } catch {
+    throw new Error(`AGENT_REPORT_BASE_URL is not a valid URL: ${override}`);
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error(`AGENT_REPORT_BASE_URL must be http(s): ${override}`);
+  }
+  return url.origin;
+}
+
 export interface AgentRunCandidate {
   ticket: Ticket;
   epic: Epic;

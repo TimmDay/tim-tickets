@@ -81,7 +81,7 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
 
       {ticket.comments.length > 0 && (
         <div
-          className="absolute top-1 right-1"
+          className="absolute top-0 right-0"
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
           onMouseEnter={showPopover}
@@ -89,7 +89,7 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
         >
           <span
             ref={iconRef}
-            className="flex h-4 w-4 items-center justify-center rounded-full text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-sm text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-gray-100"
           >
             ⓘ
           </span>
@@ -97,7 +97,7 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
       )}
 
       <p
-        className={`font-medium ${ticket.comments.length > 0 ? 'pr-5' : ''} ${
+        className={`font-medium ${ticket.comments.length > 0 ? 'pr-6' : ''} ${
           ticket.isArchived ? 'text-gray-500 italic dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
         }`}
       >

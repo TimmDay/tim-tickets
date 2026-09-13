@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, ReactNode, useContext, useMemo, useRef } from 'react';
-import { EpicColorTheme, Priority } from './types';
+import { AgentModel, EpicColorTheme, Priority } from './types';
 
 interface DraftStore<T> {
   getDraft: () => T | null;
@@ -53,6 +53,7 @@ export interface NewTicketDraft {
   jogId: string;
   epicId: string | null;
   priority: Priority | null;
+  agentModel: AgentModel | null;
   dueDate: string;
   tags: string[];
 }

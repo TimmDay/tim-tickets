@@ -51,7 +51,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ### Global "+ Add" button
 - Lives in the header, visible on all pages.
 - Opens a ticket-creation modal, reused for editing existing tickets.
-- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date.
+- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date, agent model (Default / Opus 5 / Sonnet 5 / Haiku 4.5 — the Claude model used when an agent works this ticket; see "Release the bots").
 - Clicking outside the modal (the backdrop) closes it, same as Cancel.
 
 ### Comments
@@ -86,6 +86,7 @@ interface Ticket {
   priority: Priority;
   dueDate: string | null;  // ISO date
   tags: string[];
+  agentModel: 'claude-opus-5' | 'claude-sonnet-5' | 'claude-haiku-4-5-20251001' | null; // null = workflow default
   comments: Comment[];
   order: number;           // manual/backlog + per-column kanban ordering
   createdAt: string;       // ISO

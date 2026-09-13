@@ -1,5 +1,5 @@
 import { FieldValue } from '@google-cloud/firestore';
-import { Comment, ORDER_GAP, Priority, Ticket, TicketStatus } from '../types';
+import { AgentModel, Comment, ORDER_GAP, Priority, Ticket, TicketStatus } from '../types';
 import { commitInChunks, DocSnapshotLike, FirestoreLike } from './client';
 
 function toTicket(doc: DocSnapshotLike): Ticket {
@@ -15,6 +15,7 @@ function toTicket(doc: DocSnapshotLike): Ticket {
     priority: (data.priority as Priority | null) ?? null,
     dueDate: (data.dueDate as string | null) ?? null,
     tags: (data.tags as string[]) ?? [],
+    agentModel: (data.agentModel as AgentModel | null) ?? null,
     comments: (data.comments as Comment[]) ?? [],
     order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
     isArchived: (data.isArchived as boolean) ?? false,
@@ -31,6 +32,7 @@ export interface CreateTicketInput {
   priority: Priority | null;
   dueDate: string | null;
   tags: string[];
+  agentModel: AgentModel | null;
 }
 
 export interface UpdateTicketInput {
@@ -42,6 +44,7 @@ export interface UpdateTicketInput {
   priority?: Priority | null;
   dueDate?: string | null;
   tags?: string[];
+  agentModel?: AgentModel | null;
   order?: number;
   isArchived?: boolean;
 }
@@ -115,6 +118,7 @@ export function createTicketsRepo(db: FirestoreLike) {
       priority: input.priority,
       dueDate: input.dueDate,
       tags: input.tags,
+      agentModel: input.agentModel,
       comments: [] as Comment[],
       order: Date.now(),
       isArchived: false,

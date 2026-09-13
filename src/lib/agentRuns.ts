@@ -1,7 +1,15 @@
 import { GithubRepoRef, parseGithubRepoUrl } from './github';
 import { ALL_JOGS_ID, Comment, Epic, Ticket } from './types';
 
-export const AGENT_TAG = 'dev';
+/** The tag that makes a ticket eligible for agent runs (matching the board's "EHH OII" button). */
+export const AGENT_TAG = 'EH OI';
+
+// Tags are freeform, so match ignoring case and runs of whitespace ("eh  oi" counts).
+const normalizeTag = (tag: string) => tag.trim().replace(/\s+/g, ' ').toLowerCase();
+
+export function hasAgentTag(tags: string[]): boolean {
+  return tags.some((tag) => normalizeTag(tag) === normalizeTag(AGENT_TAG));
+}
 export const AGENT_DISPATCH_EVENT_TYPE = 'tim-tickets-agent';
 
 /** Prefix of the status comments the app itself writes on agent runs. */
@@ -67,7 +75,7 @@ export interface AgentRunSelection {
 
 /**
  * Tickets "Release the bots" acts on: in the given jog (or any, for ALL_JOGS_ID), status todo
- * or in_progress, not archived, tagged `dev` (case-insensitive), and in a non-archived epic with
+ * or in_progress, not archived, tagged AGENT_TAG (`EH OI`, see hasAgentTag), and in a non-archived epic with
  * a valid GitHub repo. Shared by the board's confirm dialog and the dispatch route so what you
  * confirm is what gets sent.
  */
@@ -79,7 +87,7 @@ export function selectAgentRunCandidates(tickets: Ticket[], epics: Epic[], jogId
     if (jogId !== ALL_JOGS_ID && ticket.jogId !== jogId) continue;
     if (ticket.isArchived) continue;
     if (ticket.status !== 'todo' && ticket.status !== 'in_progress') continue;
-    if (!ticket.tags.some((tag) => tag.toLowerCase() === AGENT_TAG)) continue;
+    if (!hasAgentTag(ticket.tags)) continue;
     const epic = ticket.epicId ? epicsById.get(ticket.epicId) : undefined;
     if (!epic || epic.isArchived) continue;
     const repo = parseGithubRepoUrl(epic.repoUrl);

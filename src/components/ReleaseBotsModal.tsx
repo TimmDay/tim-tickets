@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AgentRunCandidate, selectAgentRunCandidates } from '@/lib/agentRuns';
+import { AGENT_TAG, AgentRunCandidate, selectAgentRunCandidates } from '@/lib/agentRuns';
 import { AGENT_MODELS, Epic, Ticket } from '@/lib/types';
 import { XIcon } from './XIcon';
 
@@ -87,7 +87,7 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
         ) : (
           <>
             <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-              Todo and in-progress tickets tagged <code>dev</code>, in an epic with a GitHub repo.
+              Todo and in-progress tickets tagged <code>{AGENT_TAG}</code>, in an epic with a GitHub repo.
             </p>
             {toSend.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No eligible tickets.</p>

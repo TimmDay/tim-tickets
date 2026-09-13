@@ -8,6 +8,9 @@
 # Repo setup:
 #   Secrets:  CLAUDE_CODE_OAUTH_TOKEN  (from `claude setup-token`)
 #             TIM_TICKETS_AGENT_TOKEN  (same value as tim-tickets' AGENT_API_TOKEN)
+#             VERCEL_PROTECTION_BYPASS (optional: Vercel → Settings → Deployment Protection →
+#                                       Protection Bypass for Automation; lets report-back reach
+#                                       protected preview deployments)
 #   Settings → Actions → General → Workflow permissions:
 #             tick "Allow GitHub Actions to create and approve pull requests"
 # Secret expiry/rotation and troubleshooting: docs/agent-secrets.md in tim-tickets.
@@ -98,6 +101,7 @@ jobs:
         if: always()
         env:
           AGENT_TOKEN: ${{ secrets.TIM_TICKETS_AGENT_TOKEN }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
           OUTCOME: ${{ steps.pr.outputs.outcome || 'failed' }}
           PR_URL: ${{ steps.pr.outputs.url }}
         run: |
@@ -106,7 +110,10 @@ jobs:
           else
             payload=$(jq -n --arg outcome "$OUTCOME" --arg run "$RUN_URL" '{outcome: $outcome, runUrl: $run}')
           fi
-          curl --fail-with-body -sS -X POST "$REPORT_URL" \
-            -H "Authorization: Bearer ${AGENT_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$payload"
+          headers=(-H "Authorization: Bearer ${AGENT_TOKEN}" -H "Content-Type: application/json")
+          # Vercel Deployment Protection blocks unauthenticated requests to preview deployments
+          # before they reach the app; this header lets the report-back through.
+          if [ -n "$VERCEL_BYPASS" ]; then
+            headers+=(-H "x-vercel-protection-bypass: ${VERCEL_BYPASS}")
+          fi
+          curl --fail-with-body -sS -X POST "$REPORT_URL" "${headers[@]}" -d "$payload"

@@ -12,6 +12,7 @@ import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
+import { ReleaseBotsModal } from './ReleaseBotsModal';
 import { TicketModal } from './TicketModal';
 import { ALL_JOGS_ID, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
@@ -24,6 +25,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [releasingBots, setReleasingBots] = useState(false);
   const [filterText, setFilterText] = useState('');
   const { showArchived, setShowArchived } = useShowArchived();
   const [epicFilter, setEpicFilter] = useState('all');
@@ -240,6 +242,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
         >
           Sort by priority
         </button>
+        <button
+          type="button"
+          onClick={() => setReleasingBots(true)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+        >
+          🤖 Release the bots
+        </button>
         <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
           <input
             type="checkbox"
@@ -267,6 +276,17 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           </div>
         </div>
       </DndContext>
+
+      {releasingBots && (
+        <ReleaseBotsModal
+          jogId={effectiveJogId}
+          tickets={tickets}
+          epics={epics}
+          onClose={() => setReleasingBots(false)}
+          // Dispatch moves tickets and adds comments server-side — refetch to show that.
+          onDispatched={() => router.refresh()}
+        />
+      )}
 
       {editingTicket && (
         <TicketModal

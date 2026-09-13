@@ -36,6 +36,9 @@ export interface Ticket {
   tags: string[];
   /** Model for agent runs on this ticket; null means the workflow's default. */
   agentModel: AgentModel | null;
+  /** ISO; set when an agent run is dispatched for this ticket, cleared when the agent reports
+   * back. Tickets with it set are skipped by later "Release the bots" runs. */
+  agentDispatchedAt: string | null;
   comments: Comment[];
   order: number;
   isArchived: boolean;

@@ -16,6 +16,7 @@ function toTicket(doc: DocSnapshotLike): Ticket {
     dueDate: (data.dueDate as string | null) ?? null,
     tags: (data.tags as string[]) ?? [],
     agentModel: (data.agentModel as AgentModel | null) ?? null,
+    agentDispatchedAt: (data.agentDispatchedAt as string | null) ?? null,
     comments: (data.comments as Comment[]) ?? [],
     order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
     isArchived: (data.isArchived as boolean) ?? false,
@@ -45,6 +46,7 @@ export interface UpdateTicketInput {
   dueDate?: string | null;
   tags?: string[];
   agentModel?: AgentModel | null;
+  agentDispatchedAt?: string | null;
   order?: number;
   isArchived?: boolean;
 }
@@ -119,6 +121,7 @@ export function createTicketsRepo(db: FirestoreLike) {
       dueDate: input.dueDate,
       tags: input.tags,
       agentModel: input.agentModel,
+      agentDispatchedAt: null,
       comments: [] as Comment[],
       order: Date.now(),
       isArchived: false,

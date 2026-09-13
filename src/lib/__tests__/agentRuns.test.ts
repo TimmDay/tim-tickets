@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCommentsForAgent, resolveReportBaseUrl, selectAgentRunCandidates } from '../agentRuns';
+import { formatCommentsForAgent, hasAgentTag, resolveReportBaseUrl, selectAgentRunCandidates } from '../agentRuns';
 import { ALL_JOGS_ID, Epic, Ticket } from '../types';
 
 const epic = (overrides: Partial<Epic>): Epic => ({
@@ -26,7 +26,7 @@ const ticket = (overrides: Partial<Ticket>): Ticket => ({
   epicId: 'e1',
   priority: null,
   dueDate: null,
-  tags: ['Dev'],
+  tags: ['EH OI'],
   agentModel: null,
   agentDispatchedAt: null,
   comments: [],
@@ -42,13 +42,14 @@ const ids = (candidates: { ticket: Ticket }[]) => candidates.map((c) => c.ticket
 describe('selectAgentRunCandidates', () => {
   const epics = [epic({}), epic({ id: 'no-repo', repoUrl: null }), epic({ id: 'archived', isArchived: true })];
 
-  it('selects dev-tagged todo/in-progress tickets in the jog whose epic has a valid repo', () => {
+  it('selects EH OI-tagged todo/in-progress tickets in the jog whose epic has a valid repo', () => {
     const tickets = [
       ticket({ id: 'todo' }),
-      ticket({ id: 'wip', status: 'in_progress', tags: ['DEV', 'Fun'] }),
+      ticket({ id: 'wip', status: 'in_progress', tags: ['eh oi', 'Fun'] }),
       ticket({ id: 'review', status: 'in_review' }),
       ticket({ id: 'other-jog', jogId: 'j2' }),
       ticket({ id: 'no-tag', tags: ['Fun'] }),
+      ticket({ id: 'dev-tag', tags: ['Dev'] }),
       ticket({ id: 'no-epic', epicId: null }),
       ticket({ id: 'epic-no-repo', epicId: 'no-repo' }),
       ticket({ id: 'epic-archived', epicId: 'archived' }),
@@ -110,5 +111,18 @@ describe('resolveReportBaseUrl', () => {
   it('rejects an override that is not an http(s) URL', () => {
     expect(() => resolveReportBaseUrl(requestUrl, 'abc.trycloudflare.com')).toThrow('AGENT_REPORT_BASE_URL');
     expect(() => resolveReportBaseUrl(requestUrl, 'ftp://example.com')).toThrow('must be http(s)');
+  });
+});
+
+describe('hasAgentTag', () => {
+  it('matches EH OI ignoring case and extra whitespace', () => {
+    expect(hasAgentTag(['EH OI'])).toBe(true);
+    expect(hasAgentTag(['Fun', ' eh   oi '])).toBe(true);
+  });
+
+  it('does not match other tags, including the old Dev trigger', () => {
+    expect(hasAgentTag(['Dev'])).toBe(false);
+    expect(hasAgentTag(['EHOI', 'EH OII'])).toBe(false);
+    expect(hasAgentTag([])).toBe(false);
   });
 });

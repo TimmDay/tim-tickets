@@ -209,7 +209,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
         <JogSelect
           value={effectiveJogId}
           onChange={handleSelectJog}
-          className="w-64"
+          className="w-64 lg:w-48"
           includeArchived={showArchived}
           includeAllOption
         />
@@ -219,11 +219,11 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
             <span>{selectedJog.endDate ?? '…'}</span>
           </div>
         )}
-        <div className="relative">
+        <div className="relative lg:w-40">
           <select
             value={epicFilter}
             onChange={(event) => setEpicFilter(event.target.value)}
-            className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            className="w-full appearance-none truncate rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           >
             <option value="all">All epics</option>
             <option value="none">No epic</option>
@@ -240,14 +240,14 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           onClick={handleSortByPriority}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
         >
-          Sort by priority
+          Prioritise
         </button>
         <button
           type="button"
           onClick={() => setReleasingBots(true)}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
         >
-          🤖 Release the bots
+          EHH OII
         </button>
         <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
           <input
@@ -258,7 +258,12 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           />
           Show archived
         </label>
-        <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter by title or tag…" />
+        <FilterInput
+          value={filterText}
+          onChange={setFilterText}
+          placeholder="Filter by title or tag…"
+          desktopWidthClassName="lg:w-44"
+        />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

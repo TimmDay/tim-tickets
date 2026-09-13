@@ -38,12 +38,12 @@ export function JogColumn({ status, label, tickets, onSelectTicket }: JogColumnP
         collapsed ? 'lg:self-start' : 'lg:h-full'
       } ${isOver ? 'bg-gray-100 ring-2 ring-gray-300 dark:bg-gray-800 dark:ring-gray-600' : ''}`}
     >
-      {/* While collapsed, the whole header is a tap target for expanding — the chevron alone is
-          a small target on mobile. The chevron stops propagation so a tap on it doesn't toggle
+      {/* The whole header is a tap target for expanding/collapsing — the chevron alone is a
+          small target on mobile. The chevron stops propagation so a tap on it doesn't toggle
           twice. Keyboard users still have the chevron button itself. */}
       <div
-        onClick={collapsed ? () => setCollapsed(false) : undefined}
-        className={`flex shrink-0 items-center gap-1.5 px-1 py-1 ${collapsed ? 'cursor-pointer' : ''}`}
+        onClick={() => setCollapsed((prev) => !prev)}
+        className="flex shrink-0 cursor-pointer items-center gap-1.5 px-1 py-1"
       >
         <button
           type="button"

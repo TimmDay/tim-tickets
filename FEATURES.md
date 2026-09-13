@@ -19,7 +19,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Five fixed columns: `todo`, `in_progress`, `blocked`, `in_review`, `done`, populated with tickets whose `jogId` matches the selected jog.
 - Cards are draggable both across columns (updates `status`) and within a column (reorders `order`), via `@dnd-kit/sortable`'s multi-container pattern.
 - A "Sort by priority" button reorders each column's currently visible tickets (respecting jog/epic/text filters): high, then medium, then no priority, then low, stable within each group. It's a one-shot, persisted reorder — it permutes the `order` values those tickets already hold, so their position relative to hidden tickets is unchanged, and manual dragging still works afterwards.
-- On a collapsed column, tapping anywhere on its header expands it (not just the chevron).
+- Tapping anywhere on a column's header (not just the chevron) toggles it collapsed/expanded.
 - Clicking a card opens it in the edit modal (includes Delete, and a Comments section — see below).
 - Columns fill the full remaining viewport height; each column's ticket list scrolls internally rather than growing the page.
 

@@ -1,8 +1,36 @@
 import { GithubRepoRef, parseGithubRepoUrl } from './github';
-import { ALL_JOGS_ID, Epic, Ticket } from './types';
+import { ALL_JOGS_ID, Comment, Epic, Ticket } from './types';
 
 export const AGENT_TAG = 'dev';
 export const AGENT_DISPATCH_EVENT_TYPE = 'tim-tickets-agent';
+
+/** Prefix of the status comments the app itself writes on agent runs. */
+export const AGENT_COMMENT_PREFIX = '🤖';
+
+// GitHub caps a repository_dispatch payload's size, so long comment histories are trimmed
+// (oldest first) to keep the whole payload comfortably under it.
+const MAX_AGENT_COMMENTS_LENGTH = 20_000;
+
+/**
+ * Formats a ticket's comments as prompt context for an agent: oldest first, one bullet each,
+ * skipping the app's own 🤖 status comments (noise to the agent). If over the size cap, the
+ * oldest comments are dropped first, since later ones tend to supersede them.
+ */
+export function formatCommentsForAgent(comments: Comment[]): string {
+  const lines = [...comments]
+    .filter((comment) => !comment.body.startsWith(AGENT_COMMENT_PREFIX))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((comment) => `- (${comment.createdAt.slice(0, 10)}) ${comment.body}`);
+
+  let total = lines.reduce((sum, line) => sum + line.length + 1, 0);
+  let dropped = 0;
+  while (total > MAX_AGENT_COMMENTS_LENGTH && lines.length > 1) {
+    total -= lines.shift()!.length + 1;
+    dropped++;
+  }
+  if (dropped > 0) lines.unshift(`(${dropped} older comment${dropped === 1 ? '' : 's'} omitted)`);
+  return lines.join('\n');
+}
 
 export interface AgentRunCandidate {
   ticket: Ticket;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { AGENT_DISPATCH_EVENT_TYPE, selectAgentRunCandidates } from '@/lib/agentRuns';
+import { AGENT_COMMENT_PREFIX, AGENT_DISPATCH_EVENT_TYPE, formatCommentsForAgent, selectAgentRunCandidates } from '@/lib/agentRuns';
 import { toGithubRepoUrl } from '@/lib/github';
 import { sendRepositoryDispatch } from '@/lib/githubDispatch';
 import { epicsRepo, ticketsRepo } from '@/lib/repos';
@@ -31,12 +31,16 @@ export async function POST(request: Request) {
   const reportBaseUrl = new URL(request.url).origin;
 
   const results = await Promise.all(
-    candidates.map(async ({ ticket, repo }) => {
+    candidates.map(async ({ ticket, epic, repo }) => {
       try {
         await sendRepositoryDispatch(repo, AGENT_DISPATCH_EVENT_TYPE, {
           ticketKey: ticket.key,
           title: ticket.title,
           body: ticket.body,
+          // Wider context: the feature this ticket is part of, and any clarifications in comments.
+          epicName: epic.name,
+          epicDescription: epic.description,
+          comments: formatCommentsForAgent(ticket.comments),
           model: ticket.agentModel ?? '',
           reportUrl: `${reportBaseUrl}/api/agent/tickets/${ticket.key}/report`,
         });
@@ -52,7 +56,7 @@ export async function POST(request: Request) {
       });
       await ticketsRepo.addComment(
         ticket.id,
-        `🤖 Agent dispatched to ${toGithubRepoUrl(repo).replace('https://github.com/', '')} (${modelLabel})`,
+        `${AGENT_COMMENT_PREFIX} Agent dispatched to ${toGithubRepoUrl(repo).replace('https://github.com/', '')} (${modelLabel})`,
       );
       return { key: ticket.key, ok: true as const };
     }),

@@ -64,6 +64,14 @@ jobs:
             Body:
             ${{ github.event.client_payload.body }}
 
+            This ticket is part of the epic "${{ github.event.client_payload.epicName }}".
+            Epic description (may be empty):
+            ${{ github.event.client_payload.epicDescription }}
+
+            Comments on the ticket, oldest first (may be empty; later ones may refine or override
+            the body):
+            ${{ github.event.client_payload.comments }}
+
             Implement the ticket in this repository. Follow the repo's CLAUDE.md / conventions if
             present, and run its lint/build/tests if available. Commit your work on the current
             branch with Conventional Commit messages. Do not push or open a PR — a later workflow

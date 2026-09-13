@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectAgentRunCandidates } from '../agentRuns';
+import { formatCommentsForAgent, selectAgentRunCandidates } from '../agentRuns';
 import { ALL_JOGS_ID, Epic, Ticket } from '../types';
 
 const epic = (overrides: Partial<Epic>): Epic => ({
@@ -66,5 +66,31 @@ describe('selectAgentRunCandidates', () => {
   it('scans every jog for ALL_JOGS_ID', () => {
     const tickets = [ticket({ id: 'a', jogId: 'j1' }), ticket({ id: 'b', jogId: 'j2' })];
     expect(ids(selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID).eligible)).toEqual(['a', 'b']);
+  });
+});
+
+describe('formatCommentsForAgent', () => {
+  const comment = (body: string, createdAt: string) => ({ id: body, body, createdAt });
+
+  it('lists comments oldest first, skipping the app\'s own agent status comments', () => {
+    const result = formatCommentsForAgent([
+      comment('Use the existing modal', '2026-09-03T10:00:00.000Z'),
+      comment('🤖 Agent dispatched to o/r (Default)', '2026-09-04T10:00:00.000Z'),
+      comment('Needs a migration', '2026-09-01T10:00:00.000Z'),
+    ]);
+    expect(result).toBe('- (2026-09-01) Needs a migration\n- (2026-09-03) Use the existing modal');
+  });
+
+  it('returns an empty string when there is nothing to pass on', () => {
+    expect(formatCommentsForAgent([])).toBe('');
+  });
+
+  it('drops the oldest comments first when over the size cap', () => {
+    const long = 'x'.repeat(15_000);
+    const result = formatCommentsForAgent([
+      comment(`old ${long}`, '2026-09-01T00:00:00.000Z'),
+      comment(`new ${long}`, '2026-09-02T00:00:00.000Z'),
+    ]);
+    expect(result.startsWith('(1 older comment omitted)\n- (2026-09-02) new ')).toBe(true);
   });
 });

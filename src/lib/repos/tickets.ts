@@ -1,4 +1,5 @@
 import { FieldValue } from '@google-cloud/firestore';
+import { AGENT_COMMENT_PREFIX } from '../agentRuns';
 import { AgentModel, Comment, ORDER_GAP, Priority, Ticket, TicketStatus } from '../types';
 import { commitInChunks, DocSnapshotLike, FirestoreLike } from './client';
 
@@ -193,8 +194,8 @@ export function createTicketsRepo(db: FirestoreLike) {
     const now = new Date().toISOString();
     const body =
       report.outcome === 'pr_opened'
-        ? `🤖 Agent opened a PR: ${report.prUrl}`
-        : `🤖 Agent ${report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed'}${
+        ? `${AGENT_COMMENT_PREFIX} Agent opened a PR: ${report.prUrl}`
+        : `${AGENT_COMMENT_PREFIX} Agent ${report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed'}${
             report.runUrl ? `: ${report.runUrl}` : ''
           }`;
     const comment: Comment = { id: crypto.randomUUID(), body, createdAt: now };

@@ -1,0 +1,102 @@
+# Copy to .github/workflows/tim-tickets-agent.yml in any repo an epic points at.
+#
+# Triggered by tim-tickets' "Release the bots" button (a repository_dispatch). Claude works the
+# ticket on a fresh branch, the workflow opens a PR, then reports back to tim-tickets, which
+# comments on the ticket and moves it to In Review.
+#
+# Repo setup:
+#   Secrets:  CLAUDE_CODE_OAUTH_TOKEN  (from `claude setup-token`)
+#             TIM_TICKETS_AGENT_TOKEN  (same value as tim-tickets' AGENT_API_TOKEN)
+#   Settings → Actions → General → Workflow permissions:
+#             tick "Allow GitHub Actions to create and approve pull requests"
+name: tim-tickets agent
+
+on:
+  repository_dispatch:
+    types: [tim-tickets-agent]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# One run per ticket at a time; a re-dispatch waits for the previous run rather than racing it.
+concurrency:
+  group: tim-tickets-agent-${{ github.event.client_payload.ticketKey }}
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Payload fields go through env vars, never inlined into shell scripts, so ticket text
+      # can't inject commands.
+      TICKET_KEY: ${{ github.event.client_payload.ticketKey }}
+      TICKET_TITLE: ${{ github.event.client_payload.title }}
+      REPORT_URL: ${{ github.event.client_payload.reportUrl }}
+      BASE_BRANCH: ${{ github.event.repository.default_branch }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create branch
+        id: branch
+        run: |
+          branch="agent/${TICKET_KEY}-${GITHUB_RUN_ID}"
+          git checkout -b "$branch"
+          git config user.name "tim-tickets agent"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_args: >-
+            ${{ github.event.client_payload.model && format('--model {0}', github.event.client_payload.model) || '' }}
+            --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(npm:*),Bash(npx:*),Edit,Write,Read,Glob,Grep"
+          prompt: |
+            You are working on ticket ${{ github.event.client_payload.ticketKey }} from a personal issue tracker.
+
+            Title: ${{ github.event.client_payload.title }}
+
+            Body:
+            ${{ github.event.client_payload.body }}
+
+            Implement the ticket in this repository. Follow the repo's CLAUDE.md / conventions if
+            present, and run its lint/build/tests if available. Commit your work on the current
+            branch with Conventional Commit messages. Do not push or open a PR — a later workflow
+            step does that. If the ticket is unclear or needs no code change, make no commits.
+
+      - name: Open PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(git log "origin/${BASE_BRANCH}..HEAD" --oneline)" ]; then
+            echo "outcome=no_changes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git push -u origin "${{ steps.branch.outputs.name }}"
+          pr_url=$(gh pr create --base "$BASE_BRANCH" --title "${TICKET_KEY}: ${TICKET_TITLE}" \
+            --body "Automated implementation of ${TICKET_KEY}. Workflow run: ${RUN_URL}")
+          echo "outcome=pr_opened" >> "$GITHUB_OUTPUT"
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: Report back to tim-tickets
+        if: always()
+        env:
+          AGENT_TOKEN: ${{ secrets.TIM_TICKETS_AGENT_TOKEN }}
+          OUTCOME: ${{ steps.pr.outputs.outcome || 'failed' }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          if [ "$OUTCOME" = "pr_opened" ]; then
+            payload=$(jq -n --arg url "$PR_URL" '{outcome: "pr_opened", prUrl: $url}')
+          else
+            payload=$(jq -n --arg outcome "$OUTCOME" --arg run "$RUN_URL" '{outcome: $outcome, runUrl: $run}')
+          fi
+          curl --fail-with-body -sS -X POST "$REPORT_URL" \
+            -H "Authorization: Bearer ${AGENT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$payload"

@@ -58,6 +58,14 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Tickets can have comments, added from the edit modal (list at the bottom + an add-comment input, independent of the main Save button).
 - Each ticket card on the board shows an info icon in its top-right corner; hovering it shows a popover with the ticket's comments.
 
+### Release the bots (agent runs)
+- A "🤖 Release the bots" button on the Current Jog board opens a confirm dialog listing eligible tickets in the jog selected in the dropdown (every ticket for "All tickets"; epic/text filters are ignored). A ticket is eligible if it's `todo` or `in_progress`, not archived, tagged `dev` (case-insensitive), and in a non-archived epic with a valid GitHub repo.
+- Tickets that already have a run in flight (`agentDispatchedAt` set) are skipped by default. A checkbox in the dialog re-dispatches them too.
+- Confirming calls `POST /api/agent-runs`, which sends a GitHub `repository_dispatch` (`event_type: tim-tickets-agent`) to each ticket's epic repo. The payload carries the ticket key, title, body, `agentModel` and the report-back URL. Each dispatched ticket is stamped with `agentDispatchedAt`, moved from `todo` to `in_progress`, and gets a "🤖 Agent dispatched…" comment. The dialog shows per-ticket failures (e.g. the token can't see the repo).
+- Each repo runs the workflow in `docs/agent-workflow.yml`. Claude Code (via `anthropics/claude-code-action`, subscription OAuth token, the ticket's model) commits on an `agent/T-xx-<run>` branch, the workflow opens the PR, then reports back.
+- Report-back: `POST /api/agent/tickets/:key/report` with `Authorization: Bearer $AGENT_API_TOKEN` (exempt from the session-cookie gate; this is the only thing that token can do). `{outcome: 'pr_opened', prUrl}` comments the PR link and moves the ticket to `in_review`. `{outcome: 'no_changes' | 'failed', runUrl?}` just comments. All outcomes clear `agentDispatchedAt`.
+- Env: `GITHUB_DISPATCH_TOKEN` (fine-grained PAT, Contents: read & write on the epic repos) and `AGENT_API_TOKEN`. Report-back needs the app to be reachable from GitHub, so dispatch from the deployed app, not localhost.
+
 ### Back to top button
 - Mobile-only floating button (bottom-right corner), rendered once in the app layout. Appears once you've scrolled past 400px and smooth-scrolls back to the top of the page when clicked.
 - Hidden at `lg` and up, since desktop pages scroll inside their own internal container rather than the window.
@@ -87,6 +95,7 @@ interface Ticket {
   dueDate: string | null;  // ISO date
   tags: string[];
   agentModel: 'claude-opus-5' | 'claude-sonnet-5' | 'claude-haiku-4-5-20251001' | null; // null = workflow default
+  agentDispatchedAt: string | null; // ISO; set while an agent run is in flight
   comments: Comment[];
   order: number;           // manual/backlog + per-column kanban ordering
   createdAt: string;       // ISO

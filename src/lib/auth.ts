@@ -57,3 +57,10 @@ export function checkPassword(password: string): boolean {
   if (!expected) throw new Error('Missing APP_PASSWORD env var');
   return timingSafeEqual(password, expected);
 }
+
+/** Bearer token agent workflows use to report back on a ticket (see /api/agent/). */
+export function isValidAgentToken(token: string | undefined): boolean {
+  const expected = process.env.AGENT_API_TOKEN;
+  if (!expected || !token) return false;
+  return timingSafeEqual(token, expected);
+}

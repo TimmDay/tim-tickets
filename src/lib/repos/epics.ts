@@ -8,6 +8,7 @@ function toEpic(doc: DocSnapshotLike): Epic {
     name: data.name as string,
     description: (data.description as string) ?? '',
     colorTheme: (data.colorTheme as EpicColorTheme) ?? DEFAULT_EPIC_COLOR_THEME,
+    repoUrl: (data.repoUrl as string | null) ?? null,
     isArchived: (data.isArchived as boolean) ?? false,
     startedAt: (data.startedAt as string | null) ?? null,
     completedAt: (data.completedAt as string | null) ?? null,
@@ -19,6 +20,7 @@ export interface UpdateEpicInput {
   name?: string;
   description?: string;
   colorTheme?: EpicColorTheme;
+  repoUrl?: string | null;
 }
 
 export function createEpicsRepo(db: FirestoreLike) {
@@ -36,12 +38,14 @@ export function createEpicsRepo(db: FirestoreLike) {
     name: string,
     description: string = '',
     colorTheme: EpicColorTheme = DEFAULT_EPIC_COLOR_THEME,
+    repoUrl: string | null = null,
   ): Promise<Epic> {
     const now = new Date().toISOString();
     const data = {
       name,
       description,
       colorTheme,
+      repoUrl,
       isArchived: false,
       startedAt: null,
       completedAt: null,

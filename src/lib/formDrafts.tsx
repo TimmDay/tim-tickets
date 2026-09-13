@@ -67,6 +67,7 @@ export interface NewEpicDraft {
   name: string;
   description: string;
   colorTheme: EpicColorTheme;
+  repoUrl: string;
 }
 
 const newTicketDraftStore = createDraftStore<NewTicketDraft>();

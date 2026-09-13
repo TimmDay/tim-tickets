@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { epicsRepo } from '@/lib/repos';
+import { repoUrlSchema } from '@/lib/repoUrlSchema';
 import { DEFAULT_EPIC_COLOR_THEME, EPIC_COLOR_THEME_VALUES } from '@/lib/types';
 
 const createEpicSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().default(''),
   colorTheme: z.enum(EPIC_COLOR_THEME_VALUES).default(DEFAULT_EPIC_COLOR_THEME),
+  repoUrl: repoUrlSchema.default(null),
 });
 
 export async function GET() {
@@ -21,6 +23,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const epic = await epicsRepo.createEpic(parsed.data.name, parsed.data.description, parsed.data.colorTheme);
+  const epic = await epicsRepo.createEpic(
+    parsed.data.name,
+    parsed.data.description,
+    parsed.data.colorTheme,
+    parsed.data.repoUrl,
+  );
   return NextResponse.json(epic, { status: 201 });
 }

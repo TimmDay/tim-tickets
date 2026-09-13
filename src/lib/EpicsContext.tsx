@@ -6,8 +6,14 @@ import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme } from './types';
 interface EpicsContextValue {
   epics: Epic[];
   refresh: () => Promise<void>;
-  createEpic: (name: string, description?: string, colorTheme?: EpicColorTheme) => Promise<Epic>;
-  updateEpic: (id: string, name: string, description: string, colorTheme: EpicColorTheme) => Promise<void>;
+  createEpic: (name: string, description?: string, colorTheme?: EpicColorTheme, repoUrl?: string | null) => Promise<Epic>;
+  updateEpic: (
+    id: string,
+    name: string,
+    description: string,
+    colorTheme: EpicColorTheme,
+    repoUrl: string | null,
+  ) => Promise<void>;
   deleteEpic: (id: string) => Promise<void>;
   archiveEpic: (id: string) => Promise<void>;
 }
@@ -34,12 +40,18 @@ export function EpicsProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const createEpic = useCallback(
-    async (name: string, description: string = '', colorTheme: EpicColorTheme = DEFAULT_EPIC_COLOR_THEME) => {
+    async (
+      name: string,
+      description: string = '',
+      colorTheme: EpicColorTheme = DEFAULT_EPIC_COLOR_THEME,
+      repoUrl: string | null = null,
+    ) => {
       const response = await fetch('/api/epics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description, colorTheme }),
+        body: JSON.stringify({ name, description, colorTheme, repoUrl }),
       });
+      if (!response.ok) throw new Error('Failed to create epic');
       const epic: Epic = await response.json();
       setEpics((prev) => [...prev, epic]);
       return epic;
@@ -47,14 +59,21 @@ export function EpicsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const updateEpic = useCallback(async (id: string, name: string, description: string, colorTheme: EpicColorTheme) => {
-    await fetch(`/api/epics/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description, colorTheme }),
-    });
-    setEpics((prev) => prev.map((epic) => (epic.id === id ? { ...epic, name, description, colorTheme } : epic)));
-  }, []);
+  const updateEpic = useCallback(
+    async (id: string, name: string, description: string, colorTheme: EpicColorTheme, repoUrl: string | null) => {
+      const response = await fetch(`/api/epics/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description, colorTheme, repoUrl }),
+      });
+      if (!response.ok) throw new Error('Failed to update epic');
+      const { repoUrl: savedRepoUrl } = await response.json();
+      setEpics((prev) =>
+        prev.map((epic) => (epic.id === id ? { ...epic, name, description, colorTheme, repoUrl: savedRepoUrl } : epic)),
+      );
+    },
+    [],
+  );
 
   const deleteEpic = useCallback(async (id: string) => {
     await fetch(`/api/epics/${id}`, { method: 'DELETE' });

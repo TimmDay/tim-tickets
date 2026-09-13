@@ -41,7 +41,8 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ### `/epics` — Epics list
 - Table of every epic: name, created date, started date, completed date, ticket count.
 - Clicking an epic's name navigates to the Current Jog board with the jog dropdown set to "All tickets" and the epic filter set to this epic (see below).
-- Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing only changes the epic's name.
+- Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing changes the epic's name, description, color, and GitHub repo.
+- An epic can have an optional **GitHub repo** URL (validated as `github.com/owner/repo`, stored normalized). When set, a link icon next to the epic's name opens the repo. This is the repo that agents triggered for the epic's tickets act on (see "Release the bots").
 - Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
 - Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
 - No manual reorder — epics aren't sequenced like jogs, so the list has no drag handle.
@@ -104,6 +105,7 @@ interface Epic {
   name: string;
   description: string;        // optional; shown as a tooltip on the epic chip
   colorTheme: EpicColorTheme; // chosen in the epic create/edit modal; defaults to 'indigo'
+  repoUrl: string | null;     // optional GitHub repo, normalized to https://github.com/owner/name
   isArchived: boolean;
   startedAt: string | null;   // ISO; auto-set once, first ticket to leave `todo`
   completedAt: string | null; // ISO; set when the epic is archived

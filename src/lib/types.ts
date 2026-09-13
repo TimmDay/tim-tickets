@@ -50,6 +50,9 @@ export interface Epic {
   name: string;
   description: string;
   colorTheme: EpicColorTheme;
+  /** Normalized `https://github.com/owner/name` URL of the repo this epic's work lives in, so
+   * agents triggered for its tickets know where to act. */
+  repoUrl: string | null;
   isArchived: boolean;
   startedAt: string | null;
   completedAt: string | null;

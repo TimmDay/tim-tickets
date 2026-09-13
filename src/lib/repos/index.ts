@@ -31,7 +31,7 @@ export const jogsRepo = lazyRepo(() => createJogsRepo(getFirestore()));
 export const epicsRepo = lazyRepo(() => createEpicsRepo(getFirestore()));
 export const loginAttemptsRepo = lazyRepo(() => createLoginAttemptsRepo(getFirestore()));
 
-export type { CreateTicketInput, TicketsRepo, UpdateTicketInput } from './tickets';
+export type { AgentReport, CreateTicketInput, TicketsRepo, UpdateTicketInput } from './tickets';
 export type { JogsRepo, UpdateJogInput } from './jogs';
 export type { EpicsRepo, UpdateEpicInput } from './epics';
 export type { LoginAttemptsRepo } from './loginAttempts';

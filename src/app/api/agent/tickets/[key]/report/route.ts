@@ -26,21 +26,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ key
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const ticket = await ticketsRepo.getTicketByKey(key);
-  if (!ticket) {
+  const found = await ticketsRepo.applyAgentReport(key, parsed.data);
+  if (!found) {
     return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
   }
-
-  const report = parsed.data;
-  if (report.outcome === 'pr_opened') {
-    await ticketsRepo.updateTicket(ticket.id, { status: 'in_review', agentDispatchedAt: null });
-    await ticketsRepo.addComment(ticket.id, `🤖 Agent opened a PR: ${report.prUrl}`);
-  } else {
-    // Clearing the stamp lets the next "Release the bots" pick the ticket up again.
-    await ticketsRepo.updateTicket(ticket.id, { agentDispatchedAt: null });
-    const what = report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed';
-    await ticketsRepo.addComment(ticket.id, `🤖 Agent ${what}${report.runUrl ? `: ${report.runUrl}` : ''}`);
-  }
-
   return NextResponse.json({ ok: true });
 }

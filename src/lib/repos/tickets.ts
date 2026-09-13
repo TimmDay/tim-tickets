@@ -51,6 +51,10 @@ export interface UpdateTicketInput {
   isArchived?: boolean;
 }
 
+export type AgentReport =
+  | { outcome: 'pr_opened'; prUrl: string }
+  | { outcome: 'no_changes' | 'failed'; runUrl?: string };
+
 export function createTicketsRepo(db: FirestoreLike) {
   const ticketsCollection = () => db.collection('tickets');
   const countersCollection = () => db.collection('counters');
@@ -177,6 +181,37 @@ export function createTicketsRepo(db: FirestoreLike) {
       .update({ ...input, updatedAt: now });
   }
 
+  /** Applies an agent workflow's report: a PR moves the ticket to in_review; every outcome
+   * comments and clears `agentDispatchedAt` so the ticket can be dispatched again. One
+   * transaction, so the status, stamp and comment land together. Returns false if no ticket
+   * has that key. */
+  async function applyAgentReport(key: string, report: AgentReport): Promise<boolean> {
+    const snapshot = await ticketsCollection().where('key', '==', key).limit(1).get();
+    if (snapshot.empty) return false;
+    const ref = ticketsCollection().doc(snapshot.docs[0].id);
+
+    const now = new Date().toISOString();
+    const body =
+      report.outcome === 'pr_opened'
+        ? `🤖 Agent opened a PR: ${report.prUrl}`
+        : `🤖 Agent ${report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed'}${
+            report.runUrl ? `: ${report.runUrl}` : ''
+          }`;
+    const comment: Comment = { id: crypto.randomUUID(), body, createdAt: now };
+
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      const comments = (doc.data()?.comments as Comment[]) ?? [];
+      tx.update(ref, {
+        ...(report.outcome === 'pr_opened' ? { status: 'in_review' } : {}),
+        agentDispatchedAt: null,
+        comments: [...comments, comment],
+        updatedAt: now,
+      });
+    });
+    return true;
+  }
+
   async function deleteTicket(id: string): Promise<void> {
     await ticketsCollection().doc(id).delete();
   }
@@ -210,6 +245,7 @@ export function createTicketsRepo(db: FirestoreLike) {
     reorderTickets,
     setTicketOrders,
     updateTicket,
+    applyAgentReport,
     deleteTicket,
     addComment,
     deleteComment,

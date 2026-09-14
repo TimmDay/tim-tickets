@@ -10,7 +10,10 @@ import { Linkified } from './Linkified';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { AgentModelSelect } from './AgentModelSelect';
+import { CheckIcon } from './CheckIcon';
+import { AlertIcon } from './AlertIcon';
 import { useJogs } from '@/lib/JogsContext';
+import { useEpics } from '@/lib/EpicsContext';
 import { useNewTicketDraft } from '@/lib/formDrafts';
 import { hasAgentTag } from '@/lib/agentRuns';
 import {
@@ -35,6 +38,7 @@ interface TicketModalProps {
 
 export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted }: TicketModalProps) {
   const { jogs } = useJogs();
+  const { epics } = useEpics();
   const isEditing = Boolean(ticket);
   const { getDraft, setDraft, clearDraft } = useNewTicketDraft();
   // Draft persistence only applies to new-ticket creation, not in-progress edits to an
@@ -56,6 +60,10 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const showAgentModel = hasAgentTag(tags);
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  const selectedEpic = epicId ? epics.find((epic) => epic.id === epicId) : null;
+  const epicHasRepo = selectedEpic?.repoUrl ? true : false;
+  const agentModelDisabled = showAgentModel && !epicHasRepo;
 
   function handleCopyLink() {
     if (!ticket) return;
@@ -338,7 +346,16 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               </div>
 
               <div className="order-4 col-span-2 lg:order-2 lg:col-span-1">
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Epic</label>
+                  {epicId && (
+                    epicHasRepo ? (
+                      <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <AlertIcon className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                    )
+                  )}
+                </div>
                 <EpicSelect value={epicId} onChange={setEpicId} />
               </div>
 
@@ -355,8 +372,20 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               {showAgentModel && (
                 // Mirrors Epic's slot on mobile: a narrow column beside a wide one (Due date).
                 <div className="order-6 col-span-2 lg:order-6 lg:col-span-1">
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Agent model</label>
-                  <AgentModelSelect value={agentModel} onChange={setAgentModel} />
+                  <label className={`mb-1 block text-sm font-medium ${
+                    agentModelDisabled
+                      ? 'text-gray-400 dark:text-gray-500'
+                      : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Agent model
+                  </label>
+                  {agentModelDisabled ? (
+                    <div className="w-full rounded-md border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                      No repo
+                    </div>
+                  ) : (
+                    <AgentModelSelect value={agentModel} onChange={setAgentModel} />
+                  )}
                 </div>
               )}
             </div>

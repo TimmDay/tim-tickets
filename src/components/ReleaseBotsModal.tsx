@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AGENT_TAG, AgentRunCandidate, selectAgentRunCandidates } from '@/lib/agentRuns';
-import { AGENT_MODELS, Epic, Ticket } from '@/lib/types';
+import { ALL_JOGS_ID, AGENT_MODELS, Epic, Ticket } from '@/lib/types';
 import { XIcon } from './XIcon';
 
 interface ReleaseBotsModalProps {
@@ -22,12 +22,21 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
   // Computed once on open, with the same function the server uses, so the list shown is what
   // gets dispatched (barring edits made elsewhere in between).
   const [selection] = useState(() => selectAgentRunCandidates(tickets, epics, jogId));
+  const [backlogSelection] = useState(
+    () => jogId !== ALL_JOGS_ID ? selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID) : selection,
+  );
   const [includeDispatched, setIncludeDispatched] = useState(false);
+  const [includeBacklog, setIncludeBacklog] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<DispatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const toSend = includeDispatched ? [...selection.eligible, ...selection.alreadyDispatched] : selection.eligible;
+  const backlogCandidates = includeDispatched
+    ? [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched]
+    : backlogSelection.eligible;
+  const backlogToAdd = includeBacklog ? backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id)) : [];
+  const totalToSend = [...toSend, ...backlogToAdd];
 
   async function handleRelease() {
     setSending(true);
@@ -36,7 +45,7 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
       const response = await fetch('/api/agent-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jogId, includeDispatched }),
+        body: JSON.stringify({ jogId, includeDispatched, includeBacklog }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -89,11 +98,11 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
             <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
               Todo and in-progress tickets tagged <code>{AGENT_TAG}</code>, in an epic with a GitHub repo.
             </p>
-            {toSend.length === 0 ? (
+            {totalToSend.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No eligible tickets.</p>
             ) : (
               <ul className="mb-3 space-y-1.5">
-                {toSend.map((candidate) => (
+                {totalToSend.map((candidate) => (
                   <CandidateRow key={candidate.ticket.id} candidate={candidate} />
                 ))}
               </ul>
@@ -108,6 +117,18 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
                 />
                 Also re-dispatch {selection.alreadyDispatched.length} ticket
                 {selection.alreadyDispatched.length === 1 ? '' : 's'} with an agent already running
+              </label>
+            )}
+            {jogId !== ALL_JOGS_ID && backlogToAdd.length > 0 && (
+              <label className="mb-3 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={includeBacklog}
+                  onChange={(event) => setIncludeBacklog(event.target.checked)}
+                  className="tt-checkbox"
+                />
+                Attempt tasks from backlog as well ({backlogToAdd.length} ticket
+                {backlogToAdd.length === 1 ? '' : 's'})
               </label>
             )}
             {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -126,10 +147,10 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
             <button
               type="button"
               onClick={handleRelease}
-              disabled={sending || toSend.length === 0}
+              disabled={sending || totalToSend.length === 0}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
             >
-              {sending ? 'Dispatching…' : `Dispatch ${toSend.length}`}
+              {sending ? 'Dispatching…' : `Dispatch ${totalToSend.length}`}
             </button>
           )}
         </div>

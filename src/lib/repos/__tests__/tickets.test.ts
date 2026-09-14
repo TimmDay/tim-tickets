@@ -77,6 +77,18 @@ describe('ticketsRepo.applyAgentReport', () => {
     ]);
   });
 
+  it('moves the ticket to done and comments when its agent PR is merged', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await db.collection('tickets').doc('t1').update({ status: 'in_review' });
+
+    await repo.applyAgentReport('T-1', { outcome: 'merged', prUrl: 'https://github.com/o/r/pull/7' });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('done');
+    expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 Agent PR merged: https://github.com/o/r/pull/7' })]);
+  });
+
   it('returns false for an unknown key', async () => {
     const repo = createTicketsRepo(createFakeFirestore(seedFirestore()));
     expect(await repo.applyAgentReport('T-999', { outcome: 'no_changes' })).toBe(false);

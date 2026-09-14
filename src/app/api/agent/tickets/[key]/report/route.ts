@@ -8,6 +8,8 @@ import { ticketsRepo } from '@/lib/repos';
 // instead. Deliberately narrow: all a leaked token can do is comment on / move a ticket.
 const reportSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('pr_opened'), prUrl: z.string().url() }),
+  // Sent by the separate "agent PR merged" workflow when you merge an agent's PR.
+  z.object({ outcome: z.literal('merged'), prUrl: z.string().url() }),
   z.object({ outcome: z.literal('no_changes'), runUrl: z.string().url().optional() }),
   z.object({ outcome: z.literal('failed'), runUrl: z.string().url().optional() }),
 ]);

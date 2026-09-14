@@ -1,0 +1,56 @@
+# tim-tickets' own copy of docs/agent-merged-workflow.yml (the template other epic repos copy) —
+# keep the two in sync.
+#
+# When you merge a PR that the tim-tickets agent opened (branch agent/T-xx-<run>), tells
+# tim-tickets, which comments the PR link on the ticket and moves it to Done. Closing a PR
+# without merging does nothing.
+#
+# Repo setup (in addition to the agent workflow's):
+#   Variables (Settings → Secrets and variables → Actions → Variables tab):
+#             TIM_TICKETS_URL  production app URL, e.g. https://tim-tickets.vercel.app
+#   Secrets:  TIM_TICKETS_AGENT_TOKEN   (already set for the agent workflow)
+#             VERCEL_PROTECTION_BYPASS  (optional, only if TIM_TICKETS_URL is protected)
+name: tim-tickets agent PR merged
+
+on:
+  # pull_request_target (not pull_request) so the workflow always comes from the default branch
+  # and has secrets. Safe here because it never checks out or runs the PR's code.
+  pull_request_target:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  mark-done:
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'agent/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report merge to tim-tickets
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          APP_URL: ${{ vars.TIM_TICKETS_URL }}
+          AGENT_TOKEN: ${{ secrets.TIM_TICKETS_AGENT_TOKEN }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+        run: |
+          # Branches are named agent/<ticket key>-<run id> by the agent workflow.
+          if [[ ! "$HEAD_REF" =~ ^agent/(T-[0-9]+)-[0-9]+$ ]]; then
+            echo "Branch '$HEAD_REF' isn't an agent branch (agent/T-<n>-<run>); nothing to report."
+            exit 0
+          fi
+          ticket_key="${BASH_REMATCH[1]}"
+          if [ -z "$APP_URL" ]; then
+            echo "::error::Set the TIM_TICKETS_URL repository variable to the tim-tickets app URL."
+            exit 1
+          fi
+
+          payload=$(jq -n --arg url "$PR_URL" '{outcome: "merged", prUrl: $url}')
+          headers=(-H "Authorization: Bearer ${AGENT_TOKEN}" -H "Content-Type: application/json")
+          if [ -n "$VERCEL_BYPASS" ]; then
+            headers+=(-H "x-vercel-protection-bypass: ${VERCEL_BYPASS}")
+          fi
+          curl --fail-with-body -sS -X POST "${APP_URL%/}/api/agent/tickets/${ticket_key}/report" "${headers[@]}" -d "$payload"

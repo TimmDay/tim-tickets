@@ -54,7 +54,28 @@ export interface UpdateTicketInput {
 
 export type AgentReport =
   | { outcome: 'pr_opened'; prUrl: string }
+  | { outcome: 'merged'; prUrl: string }
   | { outcome: 'no_changes' | 'failed'; runUrl?: string };
+
+/** Status a report moves the ticket to, if any. */
+const AGENT_REPORT_STATUS: Partial<Record<AgentReport['outcome'], TicketStatus>> = {
+  pr_opened: 'in_review',
+  merged: 'done',
+};
+
+function agentReportComment(report: AgentReport): string {
+  switch (report.outcome) {
+    case 'pr_opened':
+      return `${AGENT_COMMENT_PREFIX} Agent opened a PR: ${report.prUrl}`;
+    case 'merged':
+      return `${AGENT_COMMENT_PREFIX} Agent PR merged: ${report.prUrl}`;
+    case 'no_changes':
+    case 'failed': {
+      const what = report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed';
+      return `${AGENT_COMMENT_PREFIX} Agent ${what}${report.runUrl ? `: ${report.runUrl}` : ''}`;
+    }
+  }
+}
 
 export function createTicketsRepo(db: FirestoreLike) {
   const ticketsCollection = () => db.collection('tickets');
@@ -188,7 +209,8 @@ export function createTicketsRepo(db: FirestoreLike) {
       .update({ ...input, updatedAt: now });
   }
 
-  /** Applies an agent workflow's report: a PR moves the ticket to in_review; every outcome
+  /** Applies an agent workflow's report: an opened PR moves the ticket to in_review, a merged
+   * one to done (AGENT_REPORT_STATUS); every outcome
    * comments and clears `agentDispatchedAt` so the ticket can be dispatched again. One
    * transaction, so the status, stamp and comment land together. Returns false if no ticket
    * has that key. */
@@ -198,19 +220,14 @@ export function createTicketsRepo(db: FirestoreLike) {
     const ref = ticketsCollection().doc(snapshot.docs[0].id);
 
     const now = new Date().toISOString();
-    const body =
-      report.outcome === 'pr_opened'
-        ? `${AGENT_COMMENT_PREFIX} Agent opened a PR: ${report.prUrl}`
-        : `${AGENT_COMMENT_PREFIX} Agent ${report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed'}${
-            report.runUrl ? `: ${report.runUrl}` : ''
-          }`;
-    const comment: Comment = { id: crypto.randomUUID(), body, createdAt: now };
+    const comment: Comment = { id: crypto.randomUUID(), body: agentReportComment(report), createdAt: now };
+    const status = AGENT_REPORT_STATUS[report.outcome];
 
     await db.runTransaction(async (tx) => {
       const doc = await tx.get(ref);
       const comments = (doc.data()?.comments as Comment[]) ?? [];
       tx.update(ref, {
-        ...(report.outcome === 'pr_opened' ? { status: 'in_review' } : {}),
+        ...(status ? { status } : {}),
         agentDispatchedAt: null,
         comments: [...comments, comment],
         updatedAt: now,

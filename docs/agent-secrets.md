@@ -25,6 +25,7 @@ tim-tickets (Vercel) ◀──TIM_TICKETS_AGENT_TOKEN── workflow reports bac
 | `AGENT_API_TOKEN` | Vercel env vars (Preview + Production); `.env.local` for local dev | App side of report-back: checks the bearer token | No: a random string you generated; rotate only if leaked |
 | `TIM_TICKETS_AGENT_TOKEN` | Each epic repo → Actions repository secrets | Workflow side of report-back: must equal `AGENT_API_TOKEN` | No: same as above |
 | `VERCEL_PROTECTION_BYPASS` | Vercel → Settings → Deployment Protection → Protection Bypass for Automation (generated there); copied into each epic repo's Actions repository secrets | Workflow → Vercel: sent as `x-vercel-protection-bypass` so report-back gets past Vercel Authentication on **preview** deployments. Optional: production isn't protected | No: rotate only if leaked |
+| `TIM_TICKETS_URL` | Each epic repo → Settings → Secrets and variables → Actions → **Variables** tab (not a secret) | Where the "agent PR merged" workflow reports merges: the production app URL | n/a: update if the app's domain changes |
 | `AGENT_REPORT_BASE_URL` | `.env.local` only (optional) | Overrides the report-back URL, e.g. a tunnel during local dev | n/a: not a secret; tunnel URLs change each session |
 
 The workflow's own `GITHUB_TOKEN` (used to push the branch and open the PR) is created
@@ -93,6 +94,7 @@ Runs already in flight during the swap will get a 401 on report-back. Re-dispatc
 | PR opened but the "Report back" step fails with 401 | `TIM_TICKETS_AGENT_TOKEN` ≠ `AGENT_API_TOKEN`, or Vercel env not redeployed |
 | "Report back" step fails with 401 `Protected deployment` (JSON mentioning `vercel_auth_enabled`) | Dispatched from a protected preview and `VERCEL_PROTECTION_BYPASS` is missing, wrong, or regenerated in Vercel without updating the repo secret |
 | "Report back" step fails to connect, or gets HTML back | Report URL unreachable: dispatched from localhost without `AGENT_REPORT_BASE_URL`, tunnel closed, or Vercel Deployment Protection on the preview |
+| Merged an agent PR but the ticket didn't move to Done | Check the "tim-tickets agent PR merged" run in Actions. `Set the TIM_TICKETS_URL repository variable` means the variable is missing. No run at all means the branch wasn't `agent/T-<n>-<run>`, the PR was closed without merging, or the workflow isn't on the default branch |
 | Ticket stuck In Progress, skipped by later runs | Report-back never landed, so the dispatch stamp was never cleared. Fix the cause above, then tick *re-dispatch* in the dialog, or report back by hand (below) |
 
 ## Reporting back by hand
@@ -107,7 +109,7 @@ curl -X POST https://<app-url>/api/agent/tickets/T-xx/report \
   -d '{"outcome":"pr_opened","prUrl":"https://github.com/<owner>/<repo>/pull/<n>"}'
 ```
 
-The bypass header is only needed for a protected preview URL. Use `{"outcome":"failed"}` instead to just clear the stamp without moving the ticket.
+For a merged PR that didn't move its ticket, send `{"outcome":"merged","prUrl":"…"}` the same way. The bypass header is only needed for a protected preview URL. Use `{"outcome":"failed"}` instead to just clear the stamp without moving the ticket.
 
 ## Local dev with a tunnel
 

@@ -16,6 +16,10 @@ import { ReleaseBotsModal } from './ReleaseBotsModal';
 import { TicketModal } from './TicketModal';
 import { ALL_JOGS_ID, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
+function formatDate(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString() : '—';
+}
+
 export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs } = useJogs();
   const { epics } = useEpics();
@@ -83,6 +87,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       ? selectedJogId
       : (jogs[0]?.id ?? '');
   const selectedJog = jogs.find((jog) => jog.id === effectiveJogId);
+  const selectedEpic = epicFilter !== 'all' && epicFilter !== 'none' ? epics.find((epic) => epic.id === epicFilter) : undefined;
   const visibleEpics = useMemo(() => epics.filter((epic) => showArchived || !epic.isArchived), [epics, showArchived]);
 
   const ticketsByStatus = useMemo(() => {
@@ -211,11 +216,78 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex shrink-0 flex-wrap items-center gap-3">
+      {/* Mobile: each control group stacked on its own line. */}
+      <div className="mb-4 flex shrink-0 flex-col gap-3 lg:hidden">
+        <div className="flex items-center gap-3">
+          <JogSelect
+            value={effectiveJogId}
+            onChange={handleSelectJog}
+            className="w-64"
+            includeArchived={showArchived}
+            includeAllOption
+          />
+          {selectedJog && (selectedJog.startDate || selectedJog.endDate) && (
+            <div className="flex flex-col text-xs leading-tight text-gray-500 dark:text-gray-400">
+              <span>{selectedJog.startDate ?? '…'}</span>
+              <span>{selectedJog.endDate ?? '…'}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative w-64">
+            <select
+              value={epicFilter}
+              onChange={(event) => setEpicFilter(event.target.value)}
+              className="w-full appearance-none truncate rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            >
+              <option value="all">All epics</option>
+              <option value="none">No epic</option>
+              {visibleEpics.map((epic) => (
+                <option key={epic.id} value={epic.id}>
+                  {epic.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          </div>
+          {selectedEpic?.startedAt && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">Started {formatDate(selectedEpic.startedAt)}</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSortByPriority}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            Prio
+          </button>
+          <button
+            type="button"
+            onClick={() => setReleasingBots(true)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            EH OI
+          </button>
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(event) => setShowArchived(event.target.checked)}
+              className="tt-checkbox"
+            />
+            Show archived
+          </label>
+        </div>
+        <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter by title or tag…" />
+      </div>
+
+      {/* Desktop: single row, epic's started date shown above the epic select next to its label. */}
+      <div className="mb-4 hidden shrink-0 flex-wrap items-center gap-3 lg:flex">
         <JogSelect
           value={effectiveJogId}
           onChange={handleSelectJog}
-          className="w-64 lg:w-48"
+          className="w-48"
           includeArchived={showArchived}
           includeAllOption
         />
@@ -225,35 +297,43 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
             <span>{selectedJog.endDate ?? '…'}</span>
           </div>
         )}
-        <div className="relative lg:w-40">
-          <select
-            value={epicFilter}
-            onChange={(event) => setEpicFilter(event.target.value)}
-            className="w-full appearance-none truncate rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-          >
-            <option value="all">All epics</option>
-            <option value="none">No epic</option>
-            {visibleEpics.map((epic) => (
-              <option key={epic.id} value={epic.id}>
-                {epic.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+        <div className="flex w-48 flex-col gap-1">
+          {selectedEpic?.startedAt && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <span>Epic</span>
+              <span>Started {formatDate(selectedEpic.startedAt)}</span>
+            </div>
+          )}
+          <div className="relative">
+            <select
+              value={epicFilter}
+              onChange={(event) => setEpicFilter(event.target.value)}
+              className="w-full appearance-none truncate rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            >
+              <option value="all">All epics</option>
+              <option value="none">No epic</option>
+              {visibleEpics.map((epic) => (
+                <option key={epic.id} value={epic.id}>
+                  {epic.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          </div>
         </div>
         <button
           type="button"
           onClick={handleSortByPriority}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
         >
-          Prioritise
+          Prio
         </button>
         <button
           type="button"
           onClick={() => setReleasingBots(true)}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
         >
-          EHH OII
+          EH OI
         </button>
         <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
           <input

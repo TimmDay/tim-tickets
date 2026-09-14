@@ -85,10 +85,10 @@ Runs already in flight during the swap will get a 401 on report-back. Re-dispatc
 
 | What you see | Likely cause |
 |---|---|
-| EHH OII dialog: `GitHub dispatch failed (401)` | `GITHUB_DISPATCH_TOKEN` expired or wrong, or env var not on this deployment (redeploy) |
-| EHH OII dialog: `GitHub dispatch failed (404)` | Token doesn't include that repo, or the epic's repo URL is wrong |
-| EHH OII dialog: `Missing GITHUB_DISPATCH_TOKEN env var` | Not set for this environment, or `npm run dev` not restarted |
-| EHH OII dialog: `AGENT_REPORT_BASE_URL is not a valid URL` | Typo in the override; include `https://` |
+| EH OI dialog: `GitHub dispatch failed (401)` | `GITHUB_DISPATCH_TOKEN` expired or wrong, or env var not on this deployment (redeploy) |
+| EH OI dialog: `GitHub dispatch failed (404)` | Token doesn't include that repo, or the epic's repo URL is wrong |
+| EH OI dialog: `Missing GITHUB_DISPATCH_TOKEN env var` | Not set for this environment, or `npm run dev` not restarted |
+| EH OI dialog: `AGENT_REPORT_BASE_URL is not a valid URL` | Typo in the override; include `https://` |
 | Dialog says dispatched, but no run in the repo's Actions tab | Workflow file not on the repo's **default** branch |
 | Run fails at the `claude-code-action` step with an auth error | `CLAUDE_CODE_OAUTH_TOKEN` expired, missing, or in the wrong secrets section (must be *Actions*, not *Agents*) |
 | PR opened but the "Report back" step fails with 401 | `TIM_TICKETS_AGENT_TOKEN` ≠ `AGENT_API_TOKEN`, or Vercel env not redeployed |

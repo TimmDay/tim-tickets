@@ -9,11 +9,11 @@ import { LinkIcon } from './LinkIcon';
 import { Linkified } from './Linkified';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
+import { AgentModelSelect } from './AgentModelSelect';
 import { useJogs } from '@/lib/JogsContext';
 import { useNewTicketDraft } from '@/lib/formDrafts';
 import { hasAgentTag } from '@/lib/agentRuns';
 import {
-  AGENT_MODELS,
   AgentModel,
   BASE_TAGS,
   Comment,
@@ -53,6 +53,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     ticket?.agentModel ?? draft?.agentModel ?? DEFAULT_AGENT_MODEL,
   );
   const [saving, setSaving] = useState(false);
+  const showAgentModel = hasAgentTag(tags);
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -341,7 +342,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 <EpicSelect value={epicId} onChange={setEpicId} />
               </div>
 
-              <div className="order-5 col-span-3 lg:order-5 lg:col-span-1">
+              <div className={`order-5 lg:order-5 lg:col-span-1 ${showAgentModel ? 'col-span-4' : 'col-span-6'}`}>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
                 <input
                   type="date"
@@ -351,28 +352,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                 />
               </div>
 
-              {hasAgentTag(tags) && (
-                <div className="order-6 col-span-3 lg:order-6 lg:col-span-1">
-                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Agent model
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={agentModel ?? ''}
-                      onChange={(event) =>
-                        setAgentModel(event.target.value === '' ? null : (event.target.value as AgentModel))
-                      }
-                      className="w-full appearance-none rounded-md border border-gray-300 bg-white py-1.5 pr-8 pl-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    >
-                      <option value="">Default</option>
-                      {AGENT_MODELS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                  </div>
+              {showAgentModel && (
+                // Mirrors Epic's slot on mobile: a narrow column beside a wide one (Due date).
+                <div className="order-6 col-span-2 lg:order-6 lg:col-span-1">
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Agent model</label>
+                  <AgentModelSelect value={agentModel} onChange={setAgentModel} />
                 </div>
               )}
             </div>

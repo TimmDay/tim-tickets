@@ -12,6 +12,7 @@
 #                                       protected preview deployments)
 #   Settings → Actions → General → Workflow permissions:
 #             tick "Allow GitHub Actions to create and approve pull requests"
+# Pair with docs/agent-merged-workflow.yml to move tickets to Done when you merge the agent's PR.
 # Secret expiry/rotation and troubleshooting: docs/agent-secrets.md in tim-tickets.
 name: tim-tickets agent
 

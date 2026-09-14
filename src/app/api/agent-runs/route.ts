@@ -10,12 +10,14 @@ import {
 import { toGithubRepoUrl } from '@/lib/github';
 import { sendRepositoryDispatch } from '@/lib/githubDispatch';
 import { epicsRepo, ticketsRepo } from '@/lib/repos';
-import { AGENT_MODELS } from '@/lib/types';
+import { ALL_JOGS_ID, AGENT_MODELS } from '@/lib/types';
 
 const agentRunSchema = z.object({
   jogId: z.string().min(1),
   /** Also re-dispatch tickets that already have a run in flight. */
   includeDispatched: z.boolean().default(false),
+  /** Include tickets from backlog (all jogs) in addition to the selected jog. */
+  includeBacklog: z.boolean().default(false),
 });
 
 /** "Release the bots": dispatches a GitHub workflow run for every eligible ticket in the jog. */
@@ -28,9 +30,22 @@ export async function POST(request: Request) {
 
   const [tickets, epics] = await Promise.all([ticketsRepo.getTickets(), epicsRepo.getEpics()]);
   const selection = selectAgentRunCandidates(tickets, epics, parsed.data.jogId);
-  const candidates = parsed.data.includeDispatched
+
+  let allCandidates = parsed.data.includeDispatched
     ? [...selection.eligible, ...selection.alreadyDispatched]
     : selection.eligible;
+
+  if (parsed.data.includeBacklog && parsed.data.jogId !== ALL_JOGS_ID) {
+    const backlogSelection = selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID);
+    const backlogCandidates = parsed.data.includeDispatched
+      ? [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched]
+      : backlogSelection.eligible;
+    // Add backlog tickets that aren't already in the selection
+    const existingIds = new Set(allCandidates.map((c) => c.ticket.id));
+    allCandidates = [...allCandidates, ...backlogCandidates.filter((c) => !existingIds.has(c.ticket.id))];
+  }
+
+  const candidates = allCandidates;
 
   // The agent's workflow posts its result back here, so it must be reachable from GitHub — the
   // deployed app, or AGENT_REPORT_BASE_URL (e.g. a tunnel) when dispatching from local dev.

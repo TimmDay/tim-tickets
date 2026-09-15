@@ -1,7 +1,7 @@
 import { GithubRepoRef, parseGithubRepoUrl } from './github';
 import { ALL_JOGS_ID, Comment, Epic, Ticket } from './types';
 
-/** The tag that makes a ticket eligible for agent runs (matching the board's "EHH OII" button). */
+/** The tag that makes a ticket eligible for agent runs (matching the board's "EH OI" button). */
 export const AGENT_TAG = 'EH OI';
 
 // Tags are freeform, so match ignoring case and runs of whitespace ("eh  oi" counts).

@@ -18,6 +18,8 @@ const agentRunSchema = z.object({
   includeDispatched: z.boolean().default(false),
   /** Include tickets from backlog (all jogs) in addition to the selected jog. */
   includeBacklog: z.boolean().default(false),
+  /** IDs of specific tickets to dispatch (subset of eligible). */
+  selectedIds: z.array(z.string()).default([]),
 });
 
 /** "Release the bots": dispatches a GitHub workflow run for every eligible ticket in the jog. */
@@ -45,7 +47,8 @@ export async function POST(request: Request) {
     allCandidates = [...allCandidates, ...backlogCandidates.filter((c) => !existingIds.has(c.ticket.id))];
   }
 
-  const candidates = allCandidates;
+  const selectedIdSet = new Set(parsed.data.selectedIds);
+  const candidates = selectedIdSet.size > 0 ? allCandidates.filter((c) => selectedIdSet.has(c.ticket.id)) : allCandidates;
 
   // The agent's workflow posts its result back here, so it must be reachable from GitHub — the
   // deployed app, or AGENT_REPORT_BASE_URL (e.g. a tunnel) when dispatching from local dev.

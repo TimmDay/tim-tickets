@@ -27,6 +27,12 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
   );
   const [includeDispatched, setIncludeDispatched] = useState(false);
   const [includeBacklog, setIncludeBacklog] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    const toSend = [...selection.eligible, ...selection.alreadyDispatched];
+    const backlogCandidates = [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched];
+    const backlogToAdd = backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id));
+    return new Set([...toSend, ...backlogToAdd].map((c) => c.ticket.id));
+  });
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<DispatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +43,27 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
     : backlogSelection.eligible;
   const backlogToAdd = includeBacklog ? backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id)) : [];
   const totalToSend = [...toSend, ...backlogToAdd];
+  const selectedToSend = totalToSend.filter((c) => selectedIds.has(c.ticket.id));
+
+  const handleToggleAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(totalToSend.map((c) => c.ticket.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleToggleTicket = (ticketId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) {
+        next.delete(ticketId);
+      } else {
+        next.add(ticketId);
+      }
+      return next;
+    });
+  };
 
   async function handleRelease() {
     setSending(true);
@@ -45,7 +72,7 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
       const response = await fetch('/api/agent-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jogId, includeDispatched, includeBacklog }),
+        body: JSON.stringify({ jogId, includeDispatched, includeBacklog, selectedIds: Array.from(selectedIds) }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -101,11 +128,32 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
             {totalToSend.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No eligible tickets.</p>
             ) : (
-              <ul className="mb-3 space-y-1.5">
-                {totalToSend.map((candidate) => (
-                  <CandidateRow key={candidate.ticket.id} candidate={candidate} />
-                ))}
-              </ul>
+              <>
+                <div className="mb-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="select-all"
+                    checked={selectedToSend.length === totalToSend.length && totalToSend.length > 0}
+                    onChange={(event) => handleToggleAll(event.target.checked)}
+                    className="tt-checkbox"
+                  />
+                  <label htmlFor="select-all" className="text-xs text-gray-500 dark:text-gray-400">
+                    {selectedToSend.length === totalToSend.length && totalToSend.length > 0
+                      ? `All ${totalToSend.length} selected`
+                      : `Select all (${totalToSend.length})`}
+                  </label>
+                </div>
+                <ul className="mb-3 space-y-1.5">
+                  {totalToSend.map((candidate) => (
+                    <CandidateRow
+                      key={candidate.ticket.id}
+                      candidate={candidate}
+                      checked={selectedIds.has(candidate.ticket.id)}
+                      onToggle={() => handleToggleTicket(candidate.ticket.id)}
+                    />
+                  ))}
+                </ul>
+              </>
             )}
             {selection.alreadyDispatched.length > 0 && (
               <label className="mb-3 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
@@ -147,10 +195,10 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
             <button
               type="button"
               onClick={handleRelease}
-              disabled={sending || totalToSend.length === 0}
+              disabled={sending || selectedToSend.length === 0}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
             >
-              {sending ? 'Dispatching…' : `Dispatch ${totalToSend.length}`}
+              {sending ? 'Dispatching…' : `Dispatch ${selectedToSend.length}`}
             </button>
           )}
         </div>
@@ -159,14 +207,23 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
   );
 }
 
-function CandidateRow({ candidate: { ticket, repo } }: { candidate: AgentRunCandidate }) {
+function CandidateRow({
+  candidate: { ticket, repo },
+  checked,
+  onToggle,
+}: {
+  candidate: AgentRunCandidate;
+  checked: boolean;
+  onToggle: () => void;
+}) {
   const modelLabel = AGENT_MODELS.find((m) => m.value === ticket.agentModel)?.label ?? 'Default';
   return (
     <li className="rounded-md border border-gray-200 px-2.5 py-1.5 text-sm dark:border-gray-700">
-      <div className="flex items-baseline gap-2">
+      <label className="flex items-baseline gap-2 cursor-pointer">
+        <input type="checkbox" checked={checked} onChange={onToggle} className="tt-checkbox shrink-0" />
         <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">{ticket.key}</span>
         <span className="truncate text-gray-900 dark:text-gray-100">{ticket.title}</span>
-      </div>
+      </label>
       <div className="text-xs text-gray-500 dark:text-gray-400">
         {repo.owner}/{repo.name} · {modelLabel}
       </div>

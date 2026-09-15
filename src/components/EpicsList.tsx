@@ -306,8 +306,8 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           {ticketCount} ticket{ticketCount === 1 ? '' : 's'}
         </span>
-        <span>Started {formatDate(epic.startedAt)}</span>
-        <span>Completed {formatDate(epic.completedAt)}</span>
+        {epic.startedAt && <span>{formatDate(epic.startedAt)}</span>}
+        {epic.completedAt && <span>Completed {formatDate(epic.completedAt)}</span>}
       </div>
       <div className="mt-2">
         <button

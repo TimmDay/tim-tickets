@@ -71,6 +71,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       : { kind: 'unchanged' },
   );
   const [processingScreenshot, setProcessingScreenshot] = useState(false);
+  const canHaveScreenshot = status !== 'done' && !ticket?.isArchived;
   // Set once Create succeeds, so a retry after a failed screenshot upload updates that ticket
   // instead of creating a duplicate.
   const createdTicketRef = useRef<Ticket | null>(null);
@@ -133,7 +134,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   // ⌘V / Ctrl+V anywhere in the modal attaches a pasted image. Plain-text pastes (e.g. into
   // Body) carry no image file, so they're left alone.
   function handlePaste(event: ClipboardEvent) {
-    if (status === 'done') return;
+    if (!canHaveScreenshot) return;
     const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'));
     if (!file) return;
     event.preventDefault();
@@ -200,10 +201,10 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       return;
     }
 
-    // The ticket is saved; now the screenshot. Done tickets never keep one (the server clears
-    // it on the move to done and refuses new ones), so a pending change is just dropped.
+    // The ticket is saved; now the screenshot. Done/archived tickets never keep one (the server
+    // clears it and refuses new ones), so a pending change is just dropped.
     try {
-      if (status === 'done') {
+      if (!canHaveScreenshot) {
         saved = { ...saved, screenshot: null };
       } else if (screenshotChange.kind === 'set') {
         const response = await fetch(`/api/tickets/${saved.id}/screenshot`, {
@@ -285,7 +286,8 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isArchived: nextArchived }),
       });
-      onSaved({ ...ticket, isArchived: nextArchived });
+      // Archiving discards the screenshot server-side (see ticketsRepo.updateTicket).
+      onSaved({ ...ticket, isArchived: nextArchived, ...(nextArchived ? { screenshot: null } : {}) });
       onClose();
     } finally {
       setSaving(false);
@@ -483,9 +485,9 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </div>
           </div>
 
-          {/* Done tickets never keep a screenshot (it's deleted on the move to done), so don't
-              offer to add one that Save would silently drop. */}
-          {status !== 'done' && (
+          {/* Done and archived tickets never keep a screenshot (it's deleted on the move to
+              done or on archive), so don't offer to add one that Save would silently drop. */}
+          {canHaveScreenshot && (
             <ScreenshotField
               previewUrl={screenshotPreviewUrl}
               processing={processingScreenshot}

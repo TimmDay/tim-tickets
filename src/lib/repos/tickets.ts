@@ -228,9 +228,10 @@ export function createTicketsRepo(db: FirestoreLike) {
       }
     }
 
-    // Screenshots are only context for in-flight work, so moving to done discards it. Batched
-    // with the update; deleting an absent screenshot doc is a no-op.
-    if (input.status === 'done') {
+    // Screenshots are only context for in-flight work, so finishing (done) or shelving (archived)
+    // a ticket discards it — keeps Firestore storage from accumulating images nobody will use.
+    // Batched with the update; deleting an absent screenshot doc is a no-op.
+    if (input.status === 'done' || input.isArchived === true) {
       const batch = db.batch();
       batch.update(ticketsCollection().doc(id), { ...input, screenshot: null, updatedAt: now });
       batch.delete(screenshotsCollection().doc(id));
@@ -267,11 +268,10 @@ export function createTicketsRepo(db: FirestoreLike) {
         comments: [...comments, comment],
         updatedAt: now,
       });
+      // Same done-discards-screenshot rule as updateTicket, in the same transaction so the
+      // metadata and image can't get out of step.
+      if (status === 'done') tx.delete(screenshotsCollection().doc(ref.id));
     });
-    // Same done-discards-screenshot rule as updateTicket. Outside the transaction (the
-    // transaction interface has no delete); worst case is an orphaned image doc, never a
-    // ticket pointing at a missing one, since the metadata was already cleared above.
-    if (status === 'done') await screenshotsCollection().doc(ref.id).delete();
     return true;
   }
 
@@ -282,8 +282,8 @@ export function createTicketsRepo(db: FirestoreLike) {
     await batch.commit();
   }
 
-  /** Replaces the ticket's screenshot. Returns null if the ticket doesn't exist or is done —
-   * done tickets never keep a screenshot (see updateTicket). */
+  /** Replaces the ticket's screenshot. Returns null if the ticket doesn't exist, is done, or is
+   * archived — those never keep a screenshot (see updateTicket). */
   async function setScreenshot(
     ticketId: string,
     data: Buffer,
@@ -291,7 +291,8 @@ export function createTicketsRepo(db: FirestoreLike) {
   ): Promise<TicketScreenshot | null> {
     const ticketRef = ticketsCollection().doc(ticketId);
     const ticketSnap = await ticketRef.get();
-    if (!ticketSnap.exists || ticketSnap.data()?.status === 'done') return null;
+    const ticketData = ticketSnap.data();
+    if (!ticketSnap.exists || ticketData?.status === 'done' || ticketData?.isArchived) return null;
 
     const now = new Date().toISOString();
     const meta: TicketScreenshot = { contentType, size: data.length, updatedAt: now };

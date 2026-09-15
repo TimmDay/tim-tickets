@@ -159,6 +159,10 @@ export function createFakeFirestore(seed: Record<string, Record<string, DocData>
           void ref.update(data);
           return tx;
         },
+        delete(ref) {
+          void ref.delete();
+          return tx;
+        },
       };
       return fn(tx);
     },

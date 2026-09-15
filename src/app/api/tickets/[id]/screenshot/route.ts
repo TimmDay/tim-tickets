@@ -38,7 +38,7 @@ export async function PUT(request: Request, { params }: Params) {
 
   const screenshot = await ticketsRepo.setScreenshot(id, data, contentType);
   if (!screenshot) {
-    return NextResponse.json({ error: 'Ticket not found, or already done' }, { status: 404 });
+    return NextResponse.json({ error: 'Ticket not found, done, or archived' }, { status: 404 });
   }
   return NextResponse.json(screenshot);
 }

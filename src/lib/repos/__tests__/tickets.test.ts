@@ -184,6 +184,16 @@ describe('ticket screenshots', () => {
     expect((await db.collection('tickets').doc('t1').get()).data()!.screenshot).toBeNull();
   });
 
+  it('deletes the screenshot when the ticket is archived, and refuses new ones while archived', async () => {
+    const { db, repo } = await withScreenshot();
+
+    await repo.updateTicket('t1', { isArchived: true });
+
+    expect(await repo.getScreenshot('t1')).toBeNull();
+    expect((await db.collection('tickets').doc('t1').get()).data()!.screenshot).toBeNull();
+    expect(await repo.setScreenshot('t1', png, 'image/png')).toBeNull();
+  });
+
   it('deletes the screenshot along with the ticket', async () => {
     const { db, repo } = await withScreenshot();
 

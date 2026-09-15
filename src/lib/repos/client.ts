@@ -42,6 +42,7 @@ export interface TransactionLike {
   get(ref: DocRefLike): Promise<DocSnapshotLike>;
   set(ref: DocRefLike, data: Record<string, unknown>, options?: { merge?: boolean }): TransactionLike;
   update(ref: DocRefLike, data: Record<string, unknown>): TransactionLike;
+  delete(ref: DocRefLike): TransactionLike;
 }
 
 /**

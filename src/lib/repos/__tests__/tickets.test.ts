@@ -89,6 +89,38 @@ describe('ticketsRepo.applyAgentReport', () => {
     expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 Agent PR merged: https://github.com/o/r/pull/7' })]);
   });
 
+  it('moves the ticket to blocked with the agent\'s reason when the work is already done', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await db.collection('tickets').doc('t1').update({ status: 'in_progress', agentDispatchedAt: '2026-09-01T00:00:00.000Z' });
+
+    await repo.applyAgentReport('T-1', {
+      outcome: 'already_done',
+      reason: 'The tag order is already set in BASE_TAGS.',
+      runUrl: 'https://github.com/o/r/actions/runs/9',
+    });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('blocked');
+    expect(t1.agentDispatchedAt).toBeNull();
+    expect(t1.comments).toEqual([
+      expect.objectContaining({
+        body: '🤖 It seems these changes have already been made: The tag order is already set in BASE_TAGS.\n\nAgent run: https://github.com/o/r/actions/runs/9',
+      }),
+    ]);
+  });
+
+  it('still comments sensibly when the agent gives no reason', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+
+    await repo.applyAgentReport('T-1', { outcome: 'already_done' });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('blocked');
+    expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 It seems these changes have already been made.' })]);
+  });
+
   it('returns false for an unknown key', async () => {
     const repo = createTicketsRepo(createFakeFirestore(seedFirestore()));
     expect(await repo.applyAgentReport('T-999', { outcome: 'no_changes' })).toBe(false);

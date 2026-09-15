@@ -65,12 +65,16 @@ export interface UpdateTicketInput {
 export type AgentReport =
   | { outcome: 'pr_opened'; prUrl: string }
   | { outcome: 'merged'; prUrl: string }
-  | { outcome: 'no_changes' | 'failed'; runUrl?: string };
+  | { outcome: 'no_changes' | 'failed'; runUrl?: string }
+  /** The agent judged the ticket's changes to already be in the codebase. */
+  | { outcome: 'already_done'; reason?: string; runUrl?: string };
 
 /** Status a report moves the ticket to, if any. */
 const AGENT_REPORT_STATUS: Partial<Record<AgentReport['outcome'], TicketStatus>> = {
   pr_opened: 'in_review',
   merged: 'done',
+  // Needs a human: either the ticket is stale, or the agent misjudged it.
+  already_done: 'blocked',
 };
 
 function agentReportComment(report: AgentReport): string {
@@ -79,6 +83,12 @@ function agentReportComment(report: AgentReport): string {
       return `${AGENT_COMMENT_PREFIX} Agent opened a PR: ${report.prUrl}`;
     case 'merged':
       return `${AGENT_COMMENT_PREFIX} Agent PR merged: ${report.prUrl}`;
+    case 'already_done': {
+      const reason = report.reason?.trim();
+      return `${AGENT_COMMENT_PREFIX} It seems these changes have already been made${reason ? `: ${reason}` : '.'}${
+        report.runUrl ? `\n\nAgent run: ${report.runUrl}` : ''
+      }`;
+    }
     case 'no_changes':
     case 'failed': {
       const what = report.outcome === 'no_changes' ? 'finished without making any changes' : 'run failed';

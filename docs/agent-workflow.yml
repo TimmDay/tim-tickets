@@ -40,6 +40,9 @@ jobs:
       REPORT_URL: ${{ github.event.client_payload.reportUrl }}
       BASE_BRANCH: ${{ github.event.repository.default_branch }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      # Scratch folder for files passed between the workflow and Claude (screenshot in,
+      # result.json out). Git-excluded in "Create branch", so nothing in it is ever committed.
+      AGENT_DIR: .tim-tickets
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,6 +56,8 @@ jobs:
           git config user.name "tim-tickets agent"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "name=$branch" >> "$GITHUB_OUTPUT"
+          mkdir -p "$AGENT_DIR"
+          echo "$AGENT_DIR/" >> .git/info/exclude
 
       - name: Download screenshot
         id: screenshot
@@ -62,11 +67,8 @@ jobs:
           AGENT_TOKEN: ${{ secrets.TIM_TICKETS_AGENT_TOKEN }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
-          # Saved inside the checkout (Claude can Read files there) but listed in
-          # .git/info/exclude so it can never be committed.
-          dir=".tim-tickets-attachments"
-          mkdir -p "$dir"
-          echo "$dir/" >> .git/info/exclude
+          # Saved inside the checkout (Claude can Read files there), in the git-excluded AGENT_DIR.
+          dir="$AGENT_DIR"
           headers=(-H "Authorization: Bearer ${AGENT_TOKEN}")
           if [ -n "$VERCEL_BYPASS" ]; then
             headers+=(-H "x-vercel-protection-bypass: ${VERCEL_BYPASS}")
@@ -115,13 +117,25 @@ jobs:
             branch with Conventional Commit messages. Do not push or open a PR — a later workflow
             step does that. If the ticket is unclear or needs no code change, make no commits.
 
+            If you find that everything the ticket asks for is ALREADY implemented in this
+            repository, make no commits and instead write the file .tim-tickets/result.json
+            containing exactly: {"outcome": "already_done", "reason": "<one or two sentences
+            saying where and how it is already implemented>"}. Only do this when you have checked
+            the code and are confident; if just some of it exists, implement the rest instead.
+
       - name: Open PR
         id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$(git log "origin/${BASE_BRANCH}..HEAD" --oneline)" ]; then
-            echo "outcome=no_changes" >> "$GITHUB_OUTPUT"
+            # No commits: either Claude judged the work already done (and said so in
+            # result.json, per the prompt) or there was simply nothing to change.
+            if jq -e '.outcome == "already_done"' "$AGENT_DIR/result.json" > /dev/null 2>&1; then
+              echo "outcome=already_done" >> "$GITHUB_OUTPUT"
+            else
+              echo "outcome=no_changes" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           git push -u origin "${{ steps.branch.outputs.name }}"
@@ -140,6 +154,10 @@ jobs:
         run: |
           if [ "$OUTCOME" = "pr_opened" ]; then
             payload=$(jq -n --arg url "$PR_URL" '{outcome: "pr_opened", prUrl: $url}')
+          elif [ "$OUTCOME" = "already_done" ]; then
+            # Claude's reason, as plain text, capped to what the app accepts.
+            reason=$(jq -r '.reason // "" | tostring | .[0:2000]' "$AGENT_DIR/result.json" 2>/dev/null || true)
+            payload=$(jq -n --arg reason "$reason" --arg run "$RUN_URL" '{outcome: "already_done", reason: $reason, runUrl: $run}')
           else
             payload=$(jq -n --arg outcome "$OUTCOME" --arg run "$RUN_URL" '{outcome: $outcome, runUrl: $run}')
           fi

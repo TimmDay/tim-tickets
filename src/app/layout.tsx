@@ -14,11 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "tim-tickets",
+  title: "Architecture Sim",
   description: "Personal issue tracker",
   appleWebApp: {
     capable: true,
-    title: "tim-tickets",
+    title: "Architecture Sim",
     statusBarStyle: "black",
   },
 };

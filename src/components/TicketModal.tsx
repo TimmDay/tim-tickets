@@ -9,6 +9,7 @@ import { LinkIcon } from './LinkIcon';
 import { Linkified } from './Linkified';
 import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
+import { DueDateInput } from './DueDateInput';
 import { AgentModelSelect } from './AgentModelSelect';
 import { CheckIcon } from './CheckIcon';
 import { AlertIcon } from './AlertIcon';
@@ -361,12 +362,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
 
               <div className={`order-5 lg:order-5 lg:col-span-1 ${showAgentModel ? 'col-span-4' : 'col-span-6'}`}>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Due date</label>
-                <input
-                  type="date"
-                  value={dueDate ?? ''}
-                  onChange={(event) => setDueDate(event.target.value)}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                />
+                <DueDateInput value={dueDate ?? ''} onChange={setDueDate} />
               </div>
 
               {showAgentModel && (

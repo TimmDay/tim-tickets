@@ -51,7 +51,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 ### Global "+ Add" button
 - Lives in the header, visible on all pages.
 - Opens a ticket-creation modal, reused for editing existing tickets.
-- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date, agent model (Default / Opus 5 / Sonnet 5 / Haiku 4.5 — the Claude model used when an agent works this ticket; see "Release the bots").
+- Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date (shown as an Epic-style button that opens the platform's native date picker, with × to clear), agent model (Default / Opus 5 / Sonnet 5 / Haiku 4.5 — the Claude model used when an agent works this ticket; see "Release the bots").
 - Clicking outside the modal (the backdrop) closes it, same as Cancel.
 
 ### Comments

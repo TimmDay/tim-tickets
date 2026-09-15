@@ -54,6 +54,37 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "name=$branch" >> "$GITHUB_OUTPUT"
 
+      - name: Download screenshot
+        id: screenshot
+        if: github.event.client_payload.screenshotUrl != ''
+        env:
+          SCREENSHOT_URL: ${{ github.event.client_payload.screenshotUrl }}
+          AGENT_TOKEN: ${{ secrets.TIM_TICKETS_AGENT_TOKEN }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+        run: |
+          # Saved inside the checkout (Claude can Read files there) but listed in
+          # .git/info/exclude so it can never be committed.
+          dir=".tim-tickets-attachments"
+          mkdir -p "$dir"
+          echo "$dir/" >> .git/info/exclude
+          headers=(-H "Authorization: Bearer ${AGENT_TOKEN}")
+          if [ -n "$VERCEL_BYPASS" ]; then
+            headers+=(-H "x-vercel-protection-bypass: ${VERCEL_BYPASS}")
+          fi
+          if ! content_type=$(curl --fail -sS "${headers[@]}" -o "$dir/download" -w '%{content_type}' "$SCREENSHOT_URL"); then
+            # A missing screenshot is context lost, not a reason to abandon the run.
+            echo "::warning::Couldn't download the ticket's screenshot; continuing without it."
+            exit 0
+          fi
+          case "$content_type" in
+            image/png*) ext=png ;;
+            image/jpeg*) ext=jpg ;;
+            image/webp*) ext=webp ;;
+            *) echo "::warning::Unexpected screenshot type '$content_type'; continuing without it."; exit 0 ;;
+          esac
+          mv "$dir/download" "$dir/screenshot.$ext"
+          echo "path=$dir/screenshot.$ext" >> "$GITHUB_OUTPUT"
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -76,6 +107,8 @@ jobs:
             Comments on the ticket, oldest first (may be empty; later ones may refine or override
             the body):
             ${{ github.event.client_payload.comments }}
+
+            ${{ steps.screenshot.outputs.path && format('A screenshot is attached to the ticket at {0}. View it with the Read tool before starting; it shows what the ticket is about.', steps.screenshot.outputs.path) || '' }}
 
             Implement the ticket in this repository. Follow the repo's CLAUDE.md / conventions if
             present, and run its lint/build/tests if available. Commit your work on the current

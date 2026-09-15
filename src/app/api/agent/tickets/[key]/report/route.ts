@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { isValidAgentToken } from '@/lib/auth';
+import { bearerToken, isValidAgentToken } from '@/lib/auth';
 import { ticketsRepo } from '@/lib/repos';
 
 // Called by an agent's GitHub workflow, not the browser — so it's exempt from the session
@@ -15,9 +15,7 @@ const reportSchema = z.discriminatedUnion('outcome', [
 ]);
 
 export async function POST(request: Request, { params }: { params: Promise<{ key: string }> }) {
-  const authorization = request.headers.get('authorization') ?? '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined;
-  if (!isValidAgentToken(token)) {
+  if (!isValidAgentToken(bearerToken(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

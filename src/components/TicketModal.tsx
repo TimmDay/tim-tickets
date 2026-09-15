@@ -1,6 +1,6 @@
 'use client';
 
-import { SubmitEvent, useEffect, useState } from 'react';
+import { ClipboardEvent, SubmitEvent, useEffect, useRef, useState } from 'react';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { EpicSelect } from './EpicSelect';
@@ -11,12 +11,14 @@ import { TagChip, TagInput } from './TagInput';
 import { XIcon } from './XIcon';
 import { DueDateInput } from './DueDateInput';
 import { AgentModelSelect } from './AgentModelSelect';
+import { ScreenshotField } from './ScreenshotField';
 import { CheckIcon } from './CheckIcon';
 import { AlertIcon } from './AlertIcon';
 import { useJogs } from '@/lib/JogsContext';
 import { useEpics } from '@/lib/EpicsContext';
 import { useNewTicketDraft } from '@/lib/formDrafts';
 import { hasAgentTag } from '@/lib/agentRuns';
+import { compressScreenshot } from '@/lib/compressScreenshot';
 import {
   AgentModel,
   BASE_TAGS,
@@ -28,6 +30,12 @@ import {
   Ticket,
   TicketStatus,
 } from '@/lib/types';
+
+/** What Save should do with the screenshot. Nothing uploads until Save/Create. */
+type ScreenshotChange =
+  | { kind: 'unchanged' }
+  | { kind: 'set'; blob: Blob; previewUrl: string }
+  | { kind: 'remove' };
 
 interface TicketModalProps {
   ticket?: Ticket | null;
@@ -57,6 +65,15 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const [agentModel, setAgentModel] = useState<AgentModel | null>(
     ticket?.agentModel ?? draft?.agentModel ?? DEFAULT_AGENT_MODEL,
   );
+  const [screenshotChange, setScreenshotChange] = useState<ScreenshotChange>(() =>
+    draft?.screenshot
+      ? { kind: 'set', blob: draft.screenshot, previewUrl: URL.createObjectURL(draft.screenshot) }
+      : { kind: 'unchanged' },
+  );
+  const [processingScreenshot, setProcessingScreenshot] = useState(false);
+  // Set once Create succeeds, so a retry after a failed screenshot upload updates that ticket
+  // instead of creating a duplicate.
+  const createdTicketRef = useRef<Ticket | null>(null);
   const [saving, setSaving] = useState(false);
   const showAgentModel = hasAgentTag(tags);
   const [error, setError] = useState<string | null>(null);
@@ -75,8 +92,53 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
 
   useEffect(() => {
     if (isEditing) return;
-    setDraft({ title, body, jogId, epicId, priority, dueDate, tags, agentModel });
-  }, [isEditing, title, body, jogId, epicId, priority, dueDate, tags, agentModel, setDraft]);
+    const screenshot = screenshotChange.kind === 'set' ? screenshotChange.blob : null;
+    setDraft({ title, body, jogId, epicId, priority, dueDate, tags, agentModel, screenshot });
+  }, [isEditing, title, body, jogId, epicId, priority, dueDate, tags, agentModel, screenshotChange, setDraft]);
+
+  const savedScreenshotUrl = ticket?.screenshot
+    ? `/api/tickets/${ticket.id}/screenshot?v=${encodeURIComponent(ticket.screenshot.updatedAt)}`
+    : null;
+  const screenshotPreviewUrl =
+    screenshotChange.kind === 'set'
+      ? screenshotChange.previewUrl
+      : screenshotChange.kind === 'remove'
+        ? null
+        : savedScreenshotUrl;
+
+  function replaceScreenshotChange(next: ScreenshotChange) {
+    setScreenshotChange((prev) => {
+      if (prev.kind === 'set') URL.revokeObjectURL(prev.previewUrl);
+      return next;
+    });
+  }
+
+  async function handleAddScreenshot(file: File) {
+    setProcessingScreenshot(true);
+    setError(null);
+    try {
+      const blob = await compressScreenshot(file);
+      replaceScreenshotChange({ kind: 'set', blob, previewUrl: URL.createObjectURL(blob) });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Couldn’t add that screenshot.');
+    } finally {
+      setProcessingScreenshot(false);
+    }
+  }
+
+  function handleRemoveScreenshot() {
+    replaceScreenshotChange(savedScreenshotUrl ? { kind: 'remove' } : { kind: 'unchanged' });
+  }
+
+  // ⌘V / Ctrl+V anywhere in the modal attaches a pasted image. Plain-text pastes (e.g. into
+  // Body) carry no image file, so they're left alone.
+  function handlePaste(event: ClipboardEvent) {
+    if (status === 'done') return;
+    const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'));
+    if (!file) return;
+    event.preventDefault();
+    handleAddScreenshot(file);
+  }
 
   function handleCancel() {
     clearDraft();
@@ -114,27 +176,60 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       agentModel,
     };
 
+    const existing = ticket ?? createdTicketRef.current;
+    let saved: Ticket;
     try {
-      const response = await fetch(isEditing ? `/api/tickets/${ticket!.id}` : '/api/tickets', {
-        method: isEditing ? 'PATCH' : 'POST',
+      const response = await fetch(existing ? `/api/tickets/${existing.id}` : '/api/tickets', {
+        method: existing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error('Failed to save ticket');
 
-      const saved: Ticket = isEditing
-        ? { ...(ticket as Ticket), ...payload, comments, updatedAt: new Date().toISOString() }
+      saved = existing
+        ? { ...existing, ...payload, comments, updatedAt: new Date().toISOString() }
         : await response.json();
-
-      if (!isEditing) clearDraft();
-      onSaved(saved);
-      onClose();
+      if (!existing) {
+        createdTicketRef.current = saved;
+        clearDraft();
+      }
     } catch {
       setError('Something went wrong saving this ticket.');
-    } finally {
       setSaving(false);
+      return;
     }
+
+    // The ticket is saved; now the screenshot. Done tickets never keep one (the server clears
+    // it on the move to done and refuses new ones), so a pending change is just dropped.
+    try {
+      if (status === 'done') {
+        saved = { ...saved, screenshot: null };
+      } else if (screenshotChange.kind === 'set') {
+        const response = await fetch(`/api/tickets/${saved.id}/screenshot`, {
+          method: 'PUT',
+          headers: { 'Content-Type': screenshotChange.blob.type },
+          body: screenshotChange.blob,
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Upload failed');
+        saved = { ...saved, screenshot: data };
+      } else if (screenshotChange.kind === 'remove' && saved.screenshot) {
+        const response = await fetch(`/api/tickets/${saved.id}/screenshot`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Removing the screenshot failed');
+        saved = { ...saved, screenshot: null };
+      }
+    } catch (err) {
+      // Keep the modal open so the screenshot can be retried with Save.
+      onSaved(saved);
+      setError(`Ticket saved, but the screenshot didn’t save: ${err instanceof Error ? err.message : err}. Try saving again.`);
+      setSaving(false);
+      return;
+    }
+
+    onSaved(saved);
+    onClose();
+    setSaving(false);
   }
 
   async function handleAddComment() {
@@ -200,6 +295,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 sm:p-4" onClick={onClose}>
       <div
+        onPaste={handlePaste}
         className="relative h-dvh w-full overflow-y-auto bg-white px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg sm:pb-6 dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
@@ -386,6 +482,17 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
               )}
             </div>
           </div>
+
+          {/* Done tickets never keep a screenshot (it's deleted on the move to done), so don't
+              offer to add one that Save would silently drop. */}
+          {status !== 'done' && (
+            <ScreenshotField
+              previewUrl={screenshotPreviewUrl}
+              processing={processingScreenshot}
+              onAdd={handleAddScreenshot}
+              onRemove={handleRemoveScreenshot}
+            />
+          )}
 
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 

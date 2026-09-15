@@ -155,7 +155,9 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       prev.map((t) => {
         const newOrder = orderUpdates.get(t.id);
         if (newOrder === undefined) return t;
-        return t.id === activeId ? { ...t, status: targetStatus, order: newOrder } : { ...t, order: newOrder };
+        if (t.id !== activeId) return { ...t, order: newOrder };
+        // Mirrors the server: moving to done discards the ticket's screenshot.
+        return { ...t, status: targetStatus, order: newOrder, ...(targetStatus === 'done' ? { screenshot: null } : {}) };
       }),
     );
 

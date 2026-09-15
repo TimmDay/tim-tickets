@@ -58,7 +58,13 @@ export function checkPassword(password: string): boolean {
   return timingSafeEqual(password, expected);
 }
 
-/** Bearer token agent workflows use to report back on a ticket (see /api/agent/). */
+/** The token from an `Authorization: Bearer <token>` header, if present. */
+export function bearerToken(request: Request): string | undefined {
+  const authorization = request.headers.get('authorization') ?? '';
+  return authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined;
+}
+
+/** Bearer token agent workflows use to report back on (and fetch context for) a ticket (see /api/agent/). */
 export function isValidAgentToken(token: string | undefined): boolean {
   const expected = process.env.AGENT_API_TOKEN;
   if (!expected || !token) return false;

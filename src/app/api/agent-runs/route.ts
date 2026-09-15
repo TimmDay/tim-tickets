@@ -72,6 +72,9 @@ export async function POST(request: Request) {
           comments: formatCommentsForAgent(ticket.comments),
           model: ticket.agentModel ?? '',
           reportUrl: `${reportBaseUrl}/api/agent/tickets/${ticket.key}/report`,
+          // Empty when there's no screenshot; the workflow downloads it with the agent token.
+          // (Payload is 9 of GitHub's 10 allowed top-level keys — nest anything further.)
+          screenshotUrl: ticket.screenshot ? `${reportBaseUrl}/api/agent/tickets/${ticket.key}/screenshot` : '',
         });
       } catch (error) {
         return { key: ticket.key, ok: false as const, error: error instanceof Error ? error.message : String(error) };

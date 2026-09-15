@@ -1,6 +1,15 @@
 import { FieldValue } from '@google-cloud/firestore';
 import { AGENT_COMMENT_PREFIX } from '../agentRuns';
-import { AgentModel, Comment, ORDER_GAP, Priority, Ticket, TicketStatus } from '../types';
+import {
+  AgentModel,
+  Comment,
+  ORDER_GAP,
+  Priority,
+  ScreenshotContentType,
+  Ticket,
+  TicketScreenshot,
+  TicketStatus,
+} from '../types';
 import { commitInChunks, DocSnapshotLike, FirestoreLike } from './client';
 
 function toTicket(doc: DocSnapshotLike): Ticket {
@@ -18,6 +27,7 @@ function toTicket(doc: DocSnapshotLike): Ticket {
     tags: (data.tags as string[]) ?? [],
     agentModel: (data.agentModel as AgentModel | null) ?? null,
     agentDispatchedAt: (data.agentDispatchedAt as string | null) ?? null,
+    screenshot: (data.screenshot as TicketScreenshot | null) ?? null,
     comments: (data.comments as Comment[]) ?? [],
     order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
     isArchived: (data.isArchived as boolean) ?? false,
@@ -84,6 +94,9 @@ export function createTicketsRepo(db: FirestoreLike) {
   // into directly rather than depending on the epics repo: threading a repo-to-repo dependency
   // for one field stamp isn't worth it at this scope.
   const epicsCollection = () => db.collection('epics');
+  // Screenshot bytes, one doc per ticket keyed by ticket id — kept out of the ticket doc itself
+  // so getTickets() never downloads images.
+  const screenshotsCollection = () => db.collection('ticketScreenshots');
 
   const TICKET_KEY_COUNTER_ID = 'tickets';
 
@@ -148,6 +161,7 @@ export function createTicketsRepo(db: FirestoreLike) {
       tags: input.tags,
       agentModel: input.agentModel,
       agentDispatchedAt: null,
+      screenshot: null,
       comments: [] as Comment[],
       order: Date.now(),
       isArchived: false,
@@ -204,6 +218,16 @@ export function createTicketsRepo(db: FirestoreLike) {
       }
     }
 
+    // Screenshots are only context for in-flight work, so moving to done discards it. Batched
+    // with the update; deleting an absent screenshot doc is a no-op.
+    if (input.status === 'done') {
+      const batch = db.batch();
+      batch.update(ticketsCollection().doc(id), { ...input, screenshot: null, updatedAt: now });
+      batch.delete(screenshotsCollection().doc(id));
+      await batch.commit();
+      return;
+    }
+
     await ticketsCollection()
       .doc(id)
       .update({ ...input, updatedAt: now });
@@ -228,16 +252,60 @@ export function createTicketsRepo(db: FirestoreLike) {
       const comments = (doc.data()?.comments as Comment[]) ?? [];
       tx.update(ref, {
         ...(status ? { status } : {}),
+        ...(status === 'done' ? { screenshot: null } : {}),
         agentDispatchedAt: null,
         comments: [...comments, comment],
         updatedAt: now,
       });
     });
+    // Same done-discards-screenshot rule as updateTicket. Outside the transaction (the
+    // transaction interface has no delete); worst case is an orphaned image doc, never a
+    // ticket pointing at a missing one, since the metadata was already cleared above.
+    if (status === 'done') await screenshotsCollection().doc(ref.id).delete();
     return true;
   }
 
   async function deleteTicket(id: string): Promise<void> {
-    await ticketsCollection().doc(id).delete();
+    const batch = db.batch();
+    batch.delete(ticketsCollection().doc(id));
+    batch.delete(screenshotsCollection().doc(id));
+    await batch.commit();
+  }
+
+  /** Replaces the ticket's screenshot. Returns null if the ticket doesn't exist or is done —
+   * done tickets never keep a screenshot (see updateTicket). */
+  async function setScreenshot(
+    ticketId: string,
+    data: Buffer,
+    contentType: ScreenshotContentType,
+  ): Promise<TicketScreenshot | null> {
+    const ticketRef = ticketsCollection().doc(ticketId);
+    const ticketSnap = await ticketRef.get();
+    if (!ticketSnap.exists || ticketSnap.data()?.status === 'done') return null;
+
+    const now = new Date().toISOString();
+    const meta: TicketScreenshot = { contentType, size: data.length, updatedAt: now };
+    const batch = db.batch();
+    batch.set(screenshotsCollection().doc(ticketId), { data, contentType, createdAt: now });
+    batch.update(ticketRef, { screenshot: meta, updatedAt: now });
+    await batch.commit();
+    return meta;
+  }
+
+  async function getScreenshot(ticketId: string): Promise<{ data: Buffer; contentType: ScreenshotContentType } | null> {
+    const snap = await screenshotsCollection().doc(ticketId).get();
+    if (!snap.exists) return null;
+    const doc = snap.data()!;
+    return { data: Buffer.from(doc.data as Uint8Array), contentType: doc.contentType as ScreenshotContentType };
+  }
+
+  async function deleteScreenshot(ticketId: string): Promise<void> {
+    const ticketRef = ticketsCollection().doc(ticketId);
+    if (!(await ticketRef.get()).exists) return;
+    const batch = db.batch();
+    batch.delete(screenshotsCollection().doc(ticketId));
+    batch.update(ticketRef, { screenshot: null, updatedAt: new Date().toISOString() });
+    await batch.commit();
   }
 
   async function addComment(ticketId: string, body: string): Promise<Comment> {
@@ -271,6 +339,9 @@ export function createTicketsRepo(db: FirestoreLike) {
     updateTicket,
     applyAgentReport,
     deleteTicket,
+    setScreenshot,
+    getScreenshot,
+    deleteScreenshot,
     addComment,
     deleteComment,
   };

@@ -54,6 +54,13 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - Fields: title, body, jog (select, includes "+ New Jog"), priority, tags (freeform comma-separated), epic (select, includes "+ New Epic", optional), due date (shown as an Epic-style button that opens the platform's native date picker, with × to clear), agent model (Default / Opus 5 / Sonnet 5 / Haiku 4.5 — the Claude model used when an agent works this ticket; see "Release the bots").
 - Clicking outside the modal (the backdrop) closes it, same as Cancel.
 
+### Screenshots
+- A ticket can have **one** optional screenshot, added at the bottom of the create/edit modal: an "Add screenshot" button on mobile (opens the photo library), and on desktop a drop zone that's also clickable to choose a file. Pasting an image (⌘V / Ctrl+V) anywhere in the modal also works. A thumbnail (click to open full size) offers Replace / Remove.
+- The browser compresses before upload: long edge capped at 2000px, re-encoded as WebP (JPEG where WebP encoding isn't supported), stepping quality/size down until it's under 900 KB. Nothing uploads until Save/Create. If the ticket saves but the screenshot upload fails, the modal stays open to retry, and a retry after Create updates the new ticket rather than duplicating it.
+- Stored in Firestore: the bytes in `ticketScreenshots/{ticketId}` (kept out of the ticket doc so loading tickets never pulls images), with `ticket.screenshot` holding just `{contentType, size, updatedAt}`. Uploads are validated by file signature (PNG/JPEG/WebP only) and size.
+- Short-lived by design: a screenshot is **deleted when its ticket moves to `done`** (drag, modal, or a merged agent PR) **or the ticket is deleted**, and done tickets refuse new ones.
+- Agent runs: when the ticket has a screenshot, the dispatch payload includes `screenshotUrl` (`/api/agent/tickets/:key/screenshot`, bearer `AGENT_API_TOKEN`). The workflow downloads it into `.tim-tickets-attachments/` (git-excluded, so never committed) and the prompt tells Claude to view it with the Read tool. A failed download logs a warning and the run continues without it.
+
 ### Comments
 - Tickets can have comments, added from the edit modal (list at the bottom + an add-comment input, independent of the main Save button).
 - Each ticket card on the board shows an info icon in its top-right corner; hovering it shows a popover with the ticket's comments.

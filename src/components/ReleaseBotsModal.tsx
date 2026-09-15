@@ -1,7 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { AGENT_TAG, AgentRunCandidate, selectAgentRunCandidates } from '@/lib/agentRuns';
+import { useEffect, useState } from 'react';
+import {
+  AGENT_TAG,
+  AgentRunCandidate,
+  blocksDispatch,
+  describeRepoReadiness,
+  formatElapsed,
+  isAgentReportOverdue,
+  RepoAgentReadiness,
+  repoKey,
+  selectAgentRunCandidates,
+} from '@/lib/agentRuns';
+import { useNow } from '@/lib/useNow';
 import { ALL_JOGS_ID, AGENT_MODELS, Epic, Ticket } from '@/lib/types';
 import { XIcon } from './XIcon';
 
@@ -33,9 +44,39 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
     const backlogToAdd = backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id));
     return new Set([...toSend, ...backlogToAdd].map((c) => c.ticket.id));
   });
+  // Pre-flight: which target repos can actually run a dispatch (see RepoAgentReadiness).
+  // null while checking. A failed check leaves it empty rather than blocking — the dispatch
+  // route re-checks and refuses unready repos itself.
+  const [reposToCheck] = useState(() => [
+    ...new Set(
+      [...selection.eligible, ...selection.alreadyDispatched, ...backlogSelection.eligible, ...backlogSelection.alreadyDispatched].map(
+        ({ repo }) => `${repo.owner}/${repo.name}`,
+      ),
+    ),
+  ]);
+  const [readiness, setReadiness] = useState<Record<string, RepoAgentReadiness> | null>(() =>
+    reposToCheck.length === 0 ? {} : null,
+  );
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<DispatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (reposToCheck.length === 0) return;
+    const query = reposToCheck.map((repo) => `repo=${encodeURIComponent(repo)}`).join('&');
+    let cancelled = false;
+    fetch(`/api/agent-runs/repo-checks?${query}`)
+      .then((response) => (response.ok ? response.json() : {}))
+      .catch(() => ({}))
+      .then((data: Record<string, RepoAgentReadiness>) => {
+        if (!cancelled) setReadiness(data);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reposToCheck]);
+
+  const isBlocked = (candidate: AgentRunCandidate) => blocksDispatch(readiness?.[repoKey(candidate.repo)]);
 
   const toSend = includeDispatched ? [...selection.eligible, ...selection.alreadyDispatched] : selection.eligible;
   const backlogCandidates = includeDispatched
@@ -43,11 +84,13 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
     : backlogSelection.eligible;
   const backlogToAdd = includeBacklog ? backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id)) : [];
   const totalToSend = [...toSend, ...backlogToAdd];
-  const selectedToSend = totalToSend.filter((c) => selectedIds.has(c.ticket.id));
+  const sendable = totalToSend.filter((c) => !isBlocked(c));
+  const selectedToSend = sendable.filter((c) => selectedIds.has(c.ticket.id));
+  const checkingRepos = readiness === null;
 
   const handleToggleAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(totalToSend.map((c) => c.ticket.id)));
+      setSelectedIds(new Set(sendable.map((c) => c.ticket.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -72,7 +115,12 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
       const response = await fetch('/api/agent-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jogId, includeDispatched, includeBacklog, selectedIds: Array.from(selectedIds) }),
+        body: JSON.stringify({
+          jogId,
+          includeDispatched,
+          includeBacklog,
+          selectedIds: selectedToSend.map((c) => c.ticket.id),
+        }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -133,14 +181,15 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
                   <input
                     type="checkbox"
                     id="select-all"
-                    checked={selectedToSend.length === totalToSend.length && totalToSend.length > 0}
+                    checked={selectedToSend.length === sendable.length && sendable.length > 0}
+                    disabled={sendable.length === 0}
                     onChange={(event) => handleToggleAll(event.target.checked)}
                     className="tt-checkbox"
                   />
                   <label htmlFor="select-all" className="text-xs text-gray-500 dark:text-gray-400">
-                    {selectedToSend.length === totalToSend.length && totalToSend.length > 0
-                      ? `All ${totalToSend.length} selected`
-                      : `Select all (${totalToSend.length})`}
+                    {selectedToSend.length === sendable.length && sendable.length > 0
+                      ? `All ${sendable.length} selected`
+                      : `Select all (${sendable.length})`}
                   </label>
                 </div>
                 <ul className="mb-3 space-y-1.5">
@@ -148,8 +197,9 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
                     <CandidateRow
                       key={candidate.ticket.id}
                       candidate={candidate}
-                      checked={selectedIds.has(candidate.ticket.id)}
+                      checked={!isBlocked(candidate) && selectedIds.has(candidate.ticket.id)}
                       onToggle={() => handleToggleTicket(candidate.ticket.id)}
+                      setupProblem={describeRepoReadiness(candidate.repo, readiness?.[repoKey(candidate.repo)])}
                     />
                   ))}
                 </ul>
@@ -195,10 +245,10 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
             <button
               type="button"
               onClick={handleRelease}
-              disabled={sending || selectedToSend.length === 0}
+              disabled={sending || checkingRepos || selectedToSend.length === 0}
               className="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
             >
-              {sending ? 'Dispatching…' : `Dispatch ${selectedToSend.length}`}
+              {sending ? 'Dispatching…' : checkingRepos ? 'Checking repos…' : `Dispatch ${selectedToSend.length}`}
             </button>
           )}
         </div>
@@ -211,22 +261,44 @@ function CandidateRow({
   candidate: { ticket, repo },
   checked,
   onToggle,
+  setupProblem,
 }: {
   candidate: AgentRunCandidate;
   checked: boolean;
   onToggle: () => void;
+  /** Why this ticket's repo can't run agents; its row can't be selected while set. */
+  setupProblem: string | null;
 }) {
   const modelLabel = AGENT_MODELS.find((m) => m.value === ticket.agentModel)?.label ?? 'Default';
+  const now = useNow();
+  const overdue = now !== null && isAgentReportOverdue(ticket, now);
   return (
-    <li className="rounded-md border border-gray-200 px-2.5 py-1.5 text-sm dark:border-gray-700">
-      <label className="flex items-baseline gap-2 cursor-pointer">
-        <input type="checkbox" checked={checked} onChange={onToggle} className="tt-checkbox shrink-0" />
+    <li
+      className={`rounded-md border px-2.5 py-1.5 text-sm ${
+        setupProblem ? 'border-red-200 dark:border-red-900/60' : 'border-gray-200 dark:border-gray-700'
+      }`}
+    >
+      <label className={`flex items-baseline gap-2 ${setupProblem ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          disabled={Boolean(setupProblem)}
+          className="tt-checkbox shrink-0"
+        />
         <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">{ticket.key}</span>
         <span className="truncate text-gray-900 dark:text-gray-100">{ticket.title}</span>
       </label>
       <div className="text-xs text-gray-500 dark:text-gray-400">
         {repo.owner}/{repo.name} · {modelLabel}
+        {overdue && (
+          <span className="text-amber-700 dark:text-amber-400">
+            {' '}
+            · dispatched {formatElapsed(now - Date.parse(ticket.agentDispatchedAt!))} ago, no report
+          </span>
+        )}
       </div>
+      {setupProblem && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{setupProblem}</p>}
     </li>
   );
 }

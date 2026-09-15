@@ -56,6 +56,8 @@ export interface NewTicketDraft {
   agentModel: AgentModel | null;
   dueDate: string;
   tags: string[];
+  /** Compressed, not-yet-uploaded screenshot (drafts live in memory, so a Blob is fine). */
+  screenshot: Blob | null;
 }
 
 export interface NewJogDraft {

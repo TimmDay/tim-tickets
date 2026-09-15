@@ -28,6 +28,8 @@ export function createEpicsRepo(db: FirestoreLike) {
   // deleteEpic/archiveEpic cascade into member tickets — see tickets.ts for why this reaches
   // into the tickets collection directly rather than depending on the tickets repo.
   const ticketsCollection = () => db.collection('tickets');
+  // archiveEpic discards its tickets' screenshots, same rule as archiving a ticket directly.
+  const screenshotsCollection = () => db.collection('ticketScreenshots');
 
   async function getEpics(): Promise<Epic[]> {
     const snapshot = await epicsCollection().orderBy('createdAt', 'asc').get();
@@ -79,7 +81,12 @@ export function createEpicsRepo(db: FirestoreLike) {
     ];
 
     memberTickets.docs.forEach((doc) => {
-      mutations.push((batch) => batch.update(ticketsCollection().doc(doc.id), { isArchived: true, updatedAt: now }));
+      mutations.push((batch) =>
+        batch.update(ticketsCollection().doc(doc.id), { isArchived: true, screenshot: null, updatedAt: now }),
+      );
+      if (doc.data()?.screenshot) {
+        mutations.push((batch) => batch.delete(screenshotsCollection().doc(doc.id)));
+      }
     });
 
     await commitInChunks(db, mutations);

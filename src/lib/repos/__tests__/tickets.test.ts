@@ -89,8 +89,126 @@ describe('ticketsRepo.applyAgentReport', () => {
     expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 Agent PR merged: https://github.com/o/r/pull/7' })]);
   });
 
+  it('moves the ticket to blocked with the agent\'s reason when the work is already done', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await db.collection('tickets').doc('t1').update({ status: 'in_progress', agentDispatchedAt: '2026-09-01T00:00:00.000Z' });
+
+    await repo.applyAgentReport('T-1', {
+      outcome: 'already_done',
+      reason: 'The tag order is already set in BASE_TAGS.',
+      runUrl: 'https://github.com/o/r/actions/runs/9',
+    });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('blocked');
+    expect(t1.agentDispatchedAt).toBeNull();
+    expect(t1.comments).toEqual([
+      expect.objectContaining({
+        body: '🤖 It seems these changes have already been made: The tag order is already set in BASE_TAGS.\n\nAgent run: https://github.com/o/r/actions/runs/9',
+      }),
+    ]);
+  });
+
+  it('still comments sensibly when the agent gives no reason', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+
+    await repo.applyAgentReport('T-1', { outcome: 'already_done' });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.status).toBe('blocked');
+    expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 It seems these changes have already been made.' })]);
+  });
+
   it('returns false for an unknown key', async () => {
     const repo = createTicketsRepo(createFakeFirestore(seedFirestore()));
     expect(await repo.applyAgentReport('T-999', { outcome: 'no_changes' })).toBe(false);
+  });
+});
+
+describe('ticket screenshots', () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+
+  async function withScreenshot() {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    const meta = await repo.setScreenshot('t1', png, 'image/png');
+    return { db, repo, meta };
+  }
+
+  it('stores the bytes separately and records metadata on the ticket', async () => {
+    const { db, repo, meta } = await withScreenshot();
+
+    expect(meta).toMatchObject({ contentType: 'image/png', size: png.length });
+    expect((await db.collection('tickets').doc('t1').get()).data()!.screenshot).toEqual(meta);
+    expect(await repo.getScreenshot('t1')).toEqual({ data: png, contentType: 'image/png' });
+  });
+
+  it('returns null when setting a screenshot on a missing ticket', async () => {
+    const repo = createTicketsRepo(createFakeFirestore(seedFirestore()));
+    expect(await repo.setScreenshot('nope', png, 'image/png')).toBeNull();
+    expect(await repo.getScreenshot('nope')).toBeNull();
+  });
+
+  it('refuses a screenshot for a done ticket', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await repo.updateTicket('t1', { status: 'done' });
+
+    expect(await repo.setScreenshot('t1', png, 'image/png')).toBeNull();
+    expect(await repo.getScreenshot('t1')).toBeNull();
+  });
+
+  it('deletes the screenshot when the ticket moves to done, but not on other status changes', async () => {
+    const { db, repo } = await withScreenshot();
+
+    await repo.updateTicket('t1', { status: 'in_progress' });
+    expect(await repo.getScreenshot('t1')).not.toBeNull();
+
+    await repo.updateTicket('t1', { status: 'done' });
+    expect(await repo.getScreenshot('t1')).toBeNull();
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.screenshot).toBeNull();
+    expect(t1.status).toBe('done');
+  });
+
+  it('deletes the screenshot when a merged agent PR moves the ticket to done', async () => {
+    const { db, repo } = await withScreenshot();
+
+    await repo.applyAgentReport('T-1', { outcome: 'pr_opened', prUrl: 'https://github.com/o/r/pull/1' });
+    expect(await repo.getScreenshot('t1')).not.toBeNull();
+
+    await repo.applyAgentReport('T-1', { outcome: 'merged', prUrl: 'https://github.com/o/r/pull/1' });
+    expect(await repo.getScreenshot('t1')).toBeNull();
+    expect((await db.collection('tickets').doc('t1').get()).data()!.screenshot).toBeNull();
+  });
+
+  it('deletes the screenshot when the ticket is archived, and refuses new ones while archived', async () => {
+    const { db, repo } = await withScreenshot();
+
+    await repo.updateTicket('t1', { isArchived: true });
+
+    expect(await repo.getScreenshot('t1')).toBeNull();
+    expect((await db.collection('tickets').doc('t1').get()).data()!.screenshot).toBeNull();
+    expect(await repo.setScreenshot('t1', png, 'image/png')).toBeNull();
+  });
+
+  it('deletes the screenshot along with the ticket', async () => {
+    const { db, repo } = await withScreenshot();
+
+    await repo.deleteTicket('t1');
+
+    expect((await db.collection('tickets').doc('t1').get()).exists).toBe(false);
+    expect(await repo.getScreenshot('t1')).toBeNull();
+  });
+
+  it('removes a screenshot on request', async () => {
+    const { db, repo } = await withScreenshot();
+
+    await repo.deleteScreenshot('t1');
+
+    expect(await repo.getScreenshot('t1')).toBeNull();
+    expect((await db.collection('tickets').doc('t1').get()).data()!.screenshot).toBeNull();
   });
 });

@@ -29,6 +29,7 @@ const ticket = (overrides: Partial<Ticket>): Ticket => ({
   tags: ['EH OI'],
   agentModel: null,
   agentDispatchedAt: null,
+  screenshot: null,
   comments: [],
   order: nextOrder++,
   isArchived: false,

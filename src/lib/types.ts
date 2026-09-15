@@ -22,6 +22,22 @@ export interface Comment {
   createdAt: string;
 }
 
+export const SCREENSHOT_CONTENT_TYPES = ['image/webp', 'image/jpeg', 'image/png'] as const;
+
+export type ScreenshotContentType = (typeof SCREENSHOT_CONTENT_TYPES)[number];
+
+/** Stored bytes cap: comfortably under Firestore's 1 MiB document limit. The browser compresses
+ * screenshots well below this before uploading. */
+export const SCREENSHOT_MAX_BYTES = 900_000;
+
+/** Metadata for a ticket's (single, optional) screenshot. The image bytes live in their own
+ * `ticketScreenshots/{ticketId}` doc so loading tickets never pulls them in. */
+export interface TicketScreenshot {
+  contentType: ScreenshotContentType;
+  size: number;
+  updatedAt: string;
+}
+
 export interface Ticket {
   id: string;
   /** Short, human-readable, immutable identifier (e.g. "T-42") used for shareable URLs
@@ -42,6 +58,8 @@ export interface Ticket {
   /** ISO; set when an agent run is dispatched for this ticket, cleared when the agent reports
    * back. Tickets with it set are skipped by later "Release the bots" runs. */
   agentDispatchedAt: string | null;
+  /** Short-lived context for agent runs: deleted when the ticket moves to done or is deleted. */
+  screenshot: TicketScreenshot | null;
   comments: Comment[];
   order: number;
   isArchived: boolean;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { isValidAgentToken } from '@/lib/auth';
+import { bearerToken, isValidAgentToken } from '@/lib/auth';
 import { ticketsRepo } from '@/lib/repos';
 
 // Called by an agent's GitHub workflow, not the browser — so it's exempt from the session
@@ -12,12 +12,17 @@ const reportSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('merged'), prUrl: z.string().url() }),
   z.object({ outcome: z.literal('no_changes'), runUrl: z.string().url().optional() }),
   z.object({ outcome: z.literal('failed'), runUrl: z.string().url().optional() }),
+  // The agent found the work already done. `reason` is its own short explanation, capped so a
+  // runaway response can't bloat the ticket's comments.
+  z.object({
+    outcome: z.literal('already_done'),
+    reason: z.string().max(2000).optional(),
+    runUrl: z.string().url().optional(),
+  }),
 ]);
 
 export async function POST(request: Request, { params }: { params: Promise<{ key: string }> }) {
-  const authorization = request.headers.get('authorization') ?? '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : undefined;
-  if (!isValidAgentToken(token)) {
+  if (!isValidAgentToken(bearerToken(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

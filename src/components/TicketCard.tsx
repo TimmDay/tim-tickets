@@ -6,7 +6,9 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { EpicChip } from './EpicChip';
 import { Linkified } from './Linkified';
+import { formatElapsed, isAgentReportOverdue } from '@/lib/agentRuns';
 import { useEpics } from '@/lib/EpicsContext';
+import { useNow } from '@/lib/useNow';
 import { Priority, Ticket } from '@/lib/types';
 
 const PRIORITY_COLORS: Record<Priority, string> = {
@@ -24,6 +26,8 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
     id: ticket.id,
     disabled: ticket.isArchived,
   });
+  const now = useNow();
+  const agentOverdue = now !== null && isAgentReportOverdue(ticket, now);
   const iconRef = useRef<HTMLSpanElement>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
@@ -104,6 +108,14 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
         {ticket.title}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-1">
+        {agentOverdue && (
+          <span
+            title={`Agent dispatched ${formatElapsed(now - Date.parse(ticket.agentDispatchedAt!))} ago and hasn't reported back. Open the ticket for details.`}
+            className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+          >
+            🤖 no report
+          </span>
+        )}
         {ticket.tags.map((tag) => (
           <span key={tag} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
             {tag}

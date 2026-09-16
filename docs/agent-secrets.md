@@ -89,7 +89,10 @@ Runs already in flight during the swap will get a 401 on report-back. Re-dispatc
 | EH OI dialog: `GitHub dispatch failed (404)` | Token doesn't include that repo, or the epic's repo URL is wrong |
 | EH OI dialog: `Missing GITHUB_DISPATCH_TOKEN env var` | Not set for this environment, or `npm run dev` not restarted |
 | EH OI dialog: `AGENT_REPORT_BASE_URL is not a valid URL` | Typo in the override; include `https://` |
-| Dialog says dispatched, but no run in the repo's Actions tab | Workflow file not on the repo's **default** branch |
+| Dialog row: "isn't set up for agents: .github/workflows/tim-tickets-agent.yml isn't on its default branch" | Copy `docs/agent-workflow.yml` (and `docs/agent-merged-workflow.yml`) into that repo's `.github/workflows/` and merge to the default branch |
+| Dialog row: "The GitHub dispatch token can't access …" | Add the repo to `GITHUB_DISPATCH_TOKEN`'s repository access, or fix the epic's repo URL |
+| Card shows "🤖 no report" / modal says the agent hasn't reported back | The run failed before reporting, or its report was rejected. Check the repo's Actions tab, then use the rows below |
+| Dialog says dispatched, but no run in the repo's Actions tab | Workflow file not on the repo's **default** branch (normally caught by the pre-flight check, except for public repos not granted to the token) |
 | Run fails at the `claude-code-action` step with an auth error | `CLAUDE_CODE_OAUTH_TOKEN` expired, missing, or in the wrong secrets section (must be *Actions*, not *Agents*) |
 | PR opened but the "Report back" step fails with 401 | `TIM_TICKETS_AGENT_TOKEN` ≠ `AGENT_API_TOKEN`, or Vercel env not redeployed |
 | "Report back" step fails with 401 `Protected deployment` (JSON mentioning `vercel_auth_enabled`) | Dispatched from a protected preview and `VERCEL_PROTECTION_BYPASS` is missing, wrong, or regenerated in Vercel without updating the repo secret |

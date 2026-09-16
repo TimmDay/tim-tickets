@@ -3,12 +3,15 @@ import { z } from 'zod';
 import {
   AGENT_COMMENT_PREFIX,
   AGENT_DISPATCH_EVENT_TYPE,
+  blocksDispatch,
+  describeRepoReadiness,
   formatCommentsForAgent,
+  repoKey,
   resolveReportBaseUrl,
   selectAgentRunCandidates,
 } from '@/lib/agentRuns';
 import { toGithubRepoUrl } from '@/lib/github';
-import { sendRepositoryDispatch } from '@/lib/githubDispatch';
+import { checkRepoAgentReadiness, sendRepositoryDispatch } from '@/lib/githubDispatch';
 import { epicsRepo, ticketsRepo } from '@/lib/repos';
 import { ALL_JOGS_ID, AGENT_MODELS } from '@/lib/types';
 
@@ -59,8 +62,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 
+  // GitHub accepts a dispatch even when nothing in the repo listens for it, so check each target
+  // repo first and refuse (with a reason) rather than send a dispatch that silently does nothing.
+  const distinctRepos = [...new Map(candidates.map(({ repo }) => [repoKey(repo), repo])).values()];
+  const readiness = new Map(
+    await Promise.all(distinctRepos.map(async (repo) => [repoKey(repo), await checkRepoAgentReadiness(repo)] as const)),
+  );
+
   const results = await Promise.all(
     candidates.map(async ({ ticket, epic, repo }) => {
+      const repoReadiness = readiness.get(repoKey(repo));
+      if (blocksDispatch(repoReadiness)) {
+        return { key: ticket.key, ok: false as const, error: describeRepoReadiness(repo, repoReadiness)! };
+      }
       try {
         await sendRepositoryDispatch(repo, AGENT_DISPATCH_EVENT_TYPE, {
           ticketKey: ticket.key,

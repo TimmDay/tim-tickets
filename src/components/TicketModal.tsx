@@ -17,7 +17,8 @@ import { AlertIcon } from './AlertIcon';
 import { useJogs } from '@/lib/JogsContext';
 import { useEpics } from '@/lib/EpicsContext';
 import { useNewTicketDraft } from '@/lib/formDrafts';
-import { hasAgentTag } from '@/lib/agentRuns';
+import { formatElapsed, hasAgentTag, isAgentReportOverdue } from '@/lib/agentRuns';
+import { useNow } from '@/lib/useNow';
 import { compressScreenshot } from '@/lib/compressScreenshot';
 import {
   AgentModel,
@@ -71,6 +72,8 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       : { kind: 'unchanged' },
   );
   const [processingScreenshot, setProcessingScreenshot] = useState(false);
+  const now = useNow();
+  const agentOverdue = ticket && now !== null && isAgentReportOverdue(ticket, now) ? ticket : null;
   const canHaveScreenshot = status !== 'done' && !ticket?.isArchived;
   // Set once Create succeeds, so a retry after a failed screenshot upload updates that ticket
   // instead of creating a duplicate.
@@ -325,6 +328,19 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             </button>
           )}
         </div>
+        {agentOverdue && (
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+            <p className="font-medium">
+              🤖 An agent was dispatched {formatElapsed(now! - Date.parse(agentOverdue.agentDispatchedAt!))} ago and hasn’t
+              reported back.
+            </p>
+            <p className="mt-1">
+              Runs time out after an hour, so something went wrong. Check the Actions tab of the epic’s repo for a
+              failed run, or no run at all (workflow or secrets not set up). To try again, use EHH OII with
+              “re-dispatch” ticked.
+            </p>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-3">
           {isEditing && (
             <div className="lg:hidden">

@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { formatCommentsForAgent, hasAgentTag, resolveReportBaseUrl, selectAgentRunCandidates } from '../agentRuns';
+import {
+  AGENT_REPORT_OVERDUE_MS,
+  blocksDispatch,
+  describeRepoReadiness,
+  formatCommentsForAgent,
+  formatElapsed,
+  hasAgentTag,
+  interpretRepoReadiness,
+  isAgentReportOverdue,
+  repoKey,
+  resolveReportBaseUrl,
+  selectAgentRunCandidates,
+} from '../agentRuns';
 import { ALL_JOGS_ID, Epic, Ticket } from '../types';
 
 const epic = (overrides: Partial<Epic>): Epic => ({
@@ -125,5 +137,70 @@ describe('hasAgentTag', () => {
     expect(hasAgentTag(['Dev'])).toBe(false);
     expect(hasAgentTag(['EHOI', 'EH OII'])).toBe(false);
     expect(hasAgentTag([])).toBe(false);
+  });
+});
+
+describe('repo agent readiness', () => {
+  const repo = { owner: 'TimmDay', name: 'architecture-simulator' };
+
+  it('interprets the workflow lookup, using the repo lookup to tell a missing file from no access', () => {
+    expect(interpretRepoReadiness(200)).toEqual({ status: 'ready' });
+    expect(interpretRepoReadiness(404, 200)).toEqual({ status: 'workflow_missing' });
+    expect(interpretRepoReadiness(404, 404)).toEqual({ status: 'no_access' });
+    expect(interpretRepoReadiness(404, 500).status).toBe('unknown');
+    expect(interpretRepoReadiness(401)).toEqual({ status: 'unknown', message: 'GitHub rejected the dispatch token (401)' });
+    expect(interpretRepoReadiness(403).status).toBe('unknown');
+  });
+
+  it('blocks dispatch only for definite setup problems, not for failed checks', () => {
+    expect(blocksDispatch({ status: 'workflow_missing' })).toBe(true);
+    expect(blocksDispatch({ status: 'no_access' })).toBe(true);
+    expect(blocksDispatch({ status: 'ready' })).toBe(false);
+    expect(blocksDispatch({ status: 'unknown', message: 'rate limited' })).toBe(false);
+    expect(blocksDispatch(undefined)).toBe(false);
+  });
+
+  it('explains setup problems and stays quiet otherwise', () => {
+    expect(describeRepoReadiness(repo, { status: 'workflow_missing' })).toBe(
+      "TimmDay/architecture-simulator isn't set up for agents: .github/workflows/tim-tickets-agent.yml isn't on its default branch.",
+    );
+    expect(describeRepoReadiness(repo, { status: 'no_access' })).toContain("can't access TimmDay/architecture-simulator");
+    expect(describeRepoReadiness(repo, { status: 'ready' })).toBeNull();
+    expect(describeRepoReadiness(repo, { status: 'unknown', message: 'x' })).toBeNull();
+  });
+
+  it('keys repos case-insensitively', () => {
+    expect(repoKey({ owner: 'TimmDay', name: 'Tim-Tickets' })).toBe(repoKey({ owner: 'timmday', name: 'tim-tickets' }));
+  });
+});
+
+describe('agent report overdue', () => {
+  const now = Date.parse('2026-09-16T12:00:00.000Z');
+  const dispatchedAgo = (ms: number) => ({ agentDispatchedAt: new Date(now - ms).toISOString(), status: 'in_progress' as const });
+
+  it('is overdue only once past the threshold', () => {
+    expect(isAgentReportOverdue(dispatchedAgo(AGENT_REPORT_OVERDUE_MS - 60_000), now)).toBe(false);
+    expect(isAgentReportOverdue(dispatchedAgo(AGENT_REPORT_OVERDUE_MS + 60_000), now)).toBe(true);
+  });
+
+  it('is never overdue without a dispatch, or with an unparseable timestamp', () => {
+    expect(isAgentReportOverdue({ agentDispatchedAt: null, status: 'in_progress' }, now)).toBe(false);
+    expect(isAgentReportOverdue({ agentDispatchedAt: 'not a date', status: 'in_progress' }, now)).toBe(false);
+  });
+
+  it('is not flagged once the ticket has been moved on by hand', () => {
+    const stale = dispatchedAgo(AGENT_REPORT_OVERDUE_MS * 3);
+    expect(isAgentReportOverdue({ ...stale, status: 'todo' }, now)).toBe(true);
+    for (const status of ['blocked', 'in_review', 'done'] as const) {
+      expect(isAgentReportOverdue({ ...stale, status }, now)).toBe(false);
+    }
+  });
+
+  it('formats elapsed time compactly', () => {
+    expect(formatElapsed(45 * 60_000)).toBe('45m');
+    expect(formatElapsed(120 * 60_000)).toBe('2h');
+    expect(formatElapsed(125 * 60_000)).toBe('2h 5m');
+    expect(formatElapsed(3 * 24 * 60 * 60_000 + 4 * 60 * 60_000)).toBe('3d 4h');
+    expect(formatElapsed(-5)).toBe('0m');
   });
 });

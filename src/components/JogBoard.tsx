@@ -357,6 +357,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           jogId={effectiveJogId}
           tickets={tickets}
           epics={epics}
+          jogs={jogs}
           onClose={() => setReleasingBots(false)}
           // Dispatch moves tickets and adds comments server-side — refetch to show that.
           onDispatched={() => router.refresh()}

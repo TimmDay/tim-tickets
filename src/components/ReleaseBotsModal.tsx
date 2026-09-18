@@ -20,6 +20,7 @@ interface ReleaseBotsModalProps {
   jogId: string;
   tickets: Ticket[];
   epics: Epic[];
+  jogs?: { id: string; name: string }[];
   onClose: () => void;
   onDispatched: () => void;
 }
@@ -29,7 +30,7 @@ interface DispatchResult {
   failed: { key: string; error: string }[];
 }
 
-export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched }: ReleaseBotsModalProps) {
+export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, onDispatched }: ReleaseBotsModalProps) {
   // Computed once on open, with the same function the server uses, so the list shown is what
   // gets dispatched (barring edits made elsewhere in between).
   const [selection] = useState(() => selectAgentRunCandidates(tickets, epics, jogId));
@@ -200,6 +201,8 @@ export function ReleaseBotsModal({ jogId, tickets, epics, onClose, onDispatched 
                       checked={!isBlocked(candidate) && selectedIds.has(candidate.ticket.id)}
                       onToggle={() => handleToggleTicket(candidate.ticket.id)}
                       setupProblem={describeRepoReadiness(candidate.repo, readiness?.[repoKey(candidate.repo)])}
+                      isFromBacklog={jogId !== ALL_JOGS_ID && candidate.ticket.jogId !== jogId}
+                      jogName={jogs.find((j) => j.id === candidate.ticket.jogId)?.name}
                     />
                   ))}
                 </ul>
@@ -262,12 +265,18 @@ function CandidateRow({
   checked,
   onToggle,
   setupProblem,
+  isFromBacklog,
+  jogName,
 }: {
   candidate: AgentRunCandidate;
   checked: boolean;
   onToggle: () => void;
   /** Why this ticket's repo can't run agents; its row can't be selected while set. */
   setupProblem: string | null;
+  /** Whether this ticket is from the backlog (different jog). */
+  isFromBacklog?: boolean;
+  /** Name of the jog this ticket is from (for backlog tickets). */
+  jogName?: string;
 }) {
   const modelLabel = AGENT_MODELS.find((m) => m.value === ticket.agentModel)?.label ?? 'Default';
   const now = useNow();
@@ -276,7 +285,7 @@ function CandidateRow({
     <li
       className={`rounded-md border px-2.5 py-1.5 text-sm ${
         setupProblem ? 'border-red-200 dark:border-red-900/60' : 'border-gray-200 dark:border-gray-700'
-      }`}
+      } ${isFromBacklog ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}
     >
       <label className={`flex items-baseline gap-2 ${setupProblem ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
         <input
@@ -288,6 +297,7 @@ function CandidateRow({
         />
         <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">{ticket.key}</span>
         <span className="truncate text-gray-900 dark:text-gray-100">{ticket.title}</span>
+        {isFromBacklog && <span className="shrink-0 rounded px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">{jogName ?? 'Backlog'}</span>}
       </label>
       <div className="text-xs text-gray-500 dark:text-gray-400">
         {repo.owner}/{repo.name} · {modelLabel}

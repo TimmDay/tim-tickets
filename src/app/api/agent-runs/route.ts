@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   AGENT_COMMENT_PREFIX,
   AGENT_DISPATCH_EVENT_TYPE,
+  backlogAdditions,
   blocksDispatch,
   describeRepoReadiness,
   formatCommentsForAgent,
@@ -45,9 +46,7 @@ export async function POST(request: Request) {
     const backlogCandidates = parsed.data.includeDispatched
       ? [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched]
       : backlogSelection.eligible;
-    // Add backlog tickets that aren't already in the selection
-    const existingIds = new Set(allCandidates.map((c) => c.ticket.id));
-    allCandidates = [...allCandidates, ...backlogCandidates.filter((c) => !existingIds.has(c.ticket.id))];
+    allCandidates = [...allCandidates, ...backlogAdditions(allCandidates, backlogCandidates)];
   }
 
   const selectedIdSet = new Set(parsed.data.selectedIds);

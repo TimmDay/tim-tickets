@@ -103,6 +103,19 @@ export function selectAgentRunCandidates(tickets: Ticket[], epics: Epic[], jogId
   return selection;
 }
 
+/**
+ * The candidates from the "Attempt tasks from backlog as well" option: everything eligible
+ * across all jogs that isn't already in the selected jog's own list. Shared by the dialog and
+ * the dispatch route so both dedupe the same way.
+ */
+export function backlogAdditions(
+  inJog: AgentRunCandidate[],
+  acrossAllJogs: AgentRunCandidate[],
+): AgentRunCandidate[] {
+  const alreadyListed = new Set(inJog.map((candidate) => candidate.ticket.id));
+  return acrossAllJogs.filter((candidate) => !alreadyListed.has(candidate.ticket.id));
+}
+
 /** Where the agent workflow must live in a target repo. GitHub only runs repository_dispatch
  * workflows from the default branch, so that's where the readiness check looks. */
 export const AGENT_WORKFLOW_PATH = '.github/workflows/tim-tickets-agent.yml';

@@ -22,27 +22,31 @@ export function EpicSelect({ value, onChange, className, includeArchived = false
   const [openUpward, setOpenUpward] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [filter, setFilter] = useState('');
+  const triggerRef = useRef<HTMLInputElement>(null);
 
   // Same rationale as JogSelect: look up the trigger label against the full list so an
   // archived epic still shows its name, but only offer non-archived epics as new targets.
   const selected = epics.find((epic) => epic.id === value);
   const selectableEpics = epics.filter((epic) => includeArchived || !epic.isArchived);
+  const filteredEpics = open
+    ? selectableEpics.filter((epic) => epic.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    : selectableEpics;
 
-  function toggleOpen() {
-    if (!open) {
-      const spaceBelow = triggerRef.current
-        ? window.innerHeight - triggerRef.current.getBoundingClientRect().bottom
-        : Infinity;
-      setOpenUpward(spaceBelow < DROPDOWN_HEIGHT_ESTIMATE);
-    }
-    setOpen((prev) => !prev);
+  function openDropdown() {
+    if (open) return;
+    const spaceBelow = triggerRef.current
+      ? window.innerHeight - triggerRef.current.getBoundingClientRect().bottom
+      : Infinity;
+    setOpenUpward(spaceBelow < DROPDOWN_HEIGHT_ESTIMATE);
+    setOpen(true);
   }
 
   function closeAndReset() {
     setOpen(false);
     setAdding(false);
     setNewName('');
+    setFilter('');
   }
 
   function selectEpic(epic: Epic | null) {
@@ -60,14 +64,25 @@ export function EpicSelect({ value, onChange, className, includeArchived = false
 
   return (
     <div className={`relative ${className ?? ''}`}>
-      <button
+      <input
         ref={triggerRef}
-        type="button"
-        onClick={toggleOpen}
+        type="text"
+        value={open ? filter : selected?.name ?? ''}
+        placeholder="No epic"
+        onFocus={openDropdown}
+        onClick={openDropdown}
+        onChange={(event) => {
+          openDropdown();
+          setFilter(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeAndReset();
+          }
+        }}
         className="w-full truncate rounded-md border border-gray-300 bg-white px-3 py-1.5 text-left text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-      >
-        {selected?.name ?? 'No epic'}
-      </button>
+      />
 
       {open && (
         <>
@@ -91,7 +106,7 @@ export function EpicSelect({ value, onChange, className, includeArchived = false
                   No epic
                 </button>
               </li>
-              {selectableEpics.map((epic) => (
+              {filteredEpics.map((epic) => (
                 <li key={epic.id}>
                   <button
                     type="button"

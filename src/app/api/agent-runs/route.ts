@@ -53,6 +53,21 @@ export async function POST(request: Request) {
   const selectedIdSet = new Set(parsed.data.selectedIds);
   const candidates = selectedIdSet.size > 0 ? allCandidates.filter((c) => selectedIdSet.has(c.ticket.id)) : allCandidates;
 
+  // Move backlog tickets (not already in the selected jog) to the selected jog before dispatching.
+  // Compute new order values for backlog tickets: after any existing tickets in the target jog.
+  if (parsed.data.jogId !== ALL_JOGS_ID) {
+    const ticketsInJog = tickets.filter((t) => t.jogId === parsed.data.jogId);
+    let maxOrderInJog = ticketsInJog.length > 0 ? Math.max(...ticketsInJog.map((t) => t.order)) : 0;
+
+    for (const candidate of candidates) {
+      if (candidate.ticket.jogId !== parsed.data.jogId) {
+        // Move ticket to the selected jog with a new order value
+        maxOrderInJog += 1000; // ORDER_GAP
+        await ticketsRepo.updateTicket(candidate.ticket.id, { jogId: parsed.data.jogId, order: maxOrderInJog });
+      }
+    }
+  }
+
   // The agent's workflow posts its result back here, so it must be reachable from GitHub — the
   // deployed app, or AGENT_REPORT_BASE_URL (e.g. a tunnel) when dispatching from local dev.
   let reportBaseUrl: string;

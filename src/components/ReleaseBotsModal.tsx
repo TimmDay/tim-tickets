@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   AGENT_TAG,
   AgentRunCandidate,
+  backlogAdditions,
   blocksDispatch,
   describeRepoReadiness,
   formatElapsed,
@@ -38,12 +39,13 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
     () => jogId !== ALL_JOGS_ID ? selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID) : selection,
   );
   const [includeDispatched, setIncludeDispatched] = useState(false);
-  const [includeBacklog, setIncludeBacklog] = useState(false);
+  // On by default when the selected jog has nothing of its own to send: the only tickets there
+  // are to show are the backlog ones, so show them rather than an empty "no eligible tickets".
+  const [includeBacklog, setIncludeBacklog] = useState(() => selection.eligible.length === 0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     const toSend = [...selection.eligible, ...selection.alreadyDispatched];
-    const backlogCandidates = [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched];
-    const backlogToAdd = backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id));
-    return new Set([...toSend, ...backlogToAdd].map((c) => c.ticket.id));
+    const backlog = backlogAdditions(toSend, [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched]);
+    return new Set([...toSend, ...backlog].map((c) => c.ticket.id));
   });
   // Pre-flight: which target repos can actually run a dispatch (see RepoAgentReadiness).
   // null while checking. A failed check leaves it empty rather than blocking — the dispatch
@@ -83,8 +85,14 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
   const backlogCandidates = includeDispatched
     ? [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched]
     : backlogSelection.eligible;
-  const backlogToAdd = includeBacklog ? backlogCandidates.filter((c) => !toSend.find((s) => s.ticket.id === c.ticket.id)) : [];
+  // Computed whether or not the checkbox is ticked — gating this on `includeBacklog` made the
+  // count always 0 while unticked, so the checkbox that reveals them never rendered at all.
+  const backlogAvailable = jogId === ALL_JOGS_ID ? [] : backlogAdditions(toSend, backlogCandidates);
+  const backlogToAdd = includeBacklog ? backlogAvailable : [];
   const totalToSend = [...toSend, ...backlogToAdd];
+  // With the backlog included, the in-flight runs worth offering to re-dispatch are the ones
+  // across all jogs, not just the selected jog's (backlogSelection is a superset of selection).
+  const alreadyDispatched = (includeBacklog ? backlogSelection : selection).alreadyDispatched;
   const sendable = totalToSend.filter((c) => !isBlocked(c));
   const selectedToSend = sendable.filter((c) => selectedIds.has(c.ticket.id));
   const checkingRepos = readiness === null;
@@ -175,7 +183,9 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
               Todo and in-progress tickets tagged <code>{AGENT_TAG}</code>, in an epic with a GitHub repo.
             </p>
             {totalToSend.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No eligible tickets.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {backlogAvailable.length > 0 ? 'No eligible tickets in this jog.' : 'No eligible tickets.'}
+              </p>
             ) : (
               <>
                 <div className="mb-2 flex items-center gap-2">
@@ -208,7 +218,7 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
                 </ul>
               </>
             )}
-            {selection.alreadyDispatched.length > 0 && (
+            {alreadyDispatched.length > 0 && (
               <label className="mb-3 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                 <input
                   type="checkbox"
@@ -216,11 +226,11 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
                   onChange={(event) => setIncludeDispatched(event.target.checked)}
                   className="tt-checkbox"
                 />
-                Also re-dispatch {selection.alreadyDispatched.length} ticket
-                {selection.alreadyDispatched.length === 1 ? '' : 's'} with an agent already running
+                Also re-dispatch {alreadyDispatched.length} ticket
+                {alreadyDispatched.length === 1 ? '' : 's'} with an agent already running
               </label>
             )}
-            {jogId !== ALL_JOGS_ID && backlogToAdd.length > 0 && (
+            {backlogAvailable.length > 0 && (
               <label className="mb-3 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                 <input
                   type="checkbox"
@@ -228,8 +238,8 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
                   onChange={(event) => setIncludeBacklog(event.target.checked)}
                   className="tt-checkbox"
                 />
-                Attempt tasks from backlog as well ({backlogToAdd.length} ticket
-                {backlogToAdd.length === 1 ? '' : 's'})
+                Attempt tasks from backlog as well ({backlogAvailable.length} ticket
+                {backlogAvailable.length === 1 ? '' : 's'})
               </label>
             )}
             {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}

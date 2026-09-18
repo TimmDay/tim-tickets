@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_REPORT_OVERDUE_MS,
+  backlogAdditions,
   blocksDispatch,
   describeRepoReadiness,
   formatCommentsForAgent,
@@ -81,6 +82,27 @@ describe('selectAgentRunCandidates', () => {
   it('scans every jog for ALL_JOGS_ID', () => {
     const tickets = [ticket({ id: 'a', jogId: 'j1' }), ticket({ id: 'b', jogId: 'j2' })];
     expect(ids(selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID).eligible)).toEqual(['a', 'b']);
+  });
+});
+
+describe('backlogAdditions', () => {
+  const epics = [epic({})];
+
+  it('offers eligible tickets from other jogs, even when the selected jog has none of its own', () => {
+    const tickets = [ticket({ id: 'backlog', jogId: 'default' })];
+    const inJog = selectAgentRunCandidates(tickets, epics, 'j1').eligible;
+    const allJogs = selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID).eligible;
+
+    expect(ids(inJog)).toEqual([]);
+    expect(ids(backlogAdditions(inJog, allJogs))).toEqual(['backlog']);
+  });
+
+  it('does not repeat tickets already listed for the selected jog', () => {
+    const tickets = [ticket({ id: 'mine', jogId: 'j1' }), ticket({ id: 'backlog', jogId: 'default' })];
+    const inJog = selectAgentRunCandidates(tickets, epics, 'j1').eligible;
+    const allJogs = selectAgentRunCandidates(tickets, epics, ALL_JOGS_ID).eligible;
+
+    expect(ids(backlogAdditions(inJog, allJogs))).toEqual(['backlog']);
   });
 });
 

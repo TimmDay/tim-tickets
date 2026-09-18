@@ -5,10 +5,11 @@ import { repoUrlSchema } from '@/lib/repoUrlSchema';
 import { EPIC_COLOR_THEME_VALUES } from '@/lib/types';
 
 const updateEpicSchema = z.object({
-  name: z.string().trim().min(1),
+  name: z.string().trim().min(1).optional(),
   description: z.string().optional(),
   colorTheme: z.enum(EPIC_COLOR_THEME_VALUES).optional(),
   repoUrl: repoUrlSchema.optional(),
+  order: z.number().optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

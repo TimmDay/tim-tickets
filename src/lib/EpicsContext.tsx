@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme } from './types';
+import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme, ORDER_GAP } from './types';
 
 interface EpicsContextValue {
   epics: Epic[];
@@ -14,6 +14,8 @@ interface EpicsContextValue {
     colorTheme: EpicColorTheme,
     repoUrl: string | null,
   ) => Promise<void>;
+  updateEpicOrder: (id: string, order: number) => Promise<void>;
+  reorderEpics: (orderedIds: string[]) => Promise<void>;
   deleteEpic: (id: string) => Promise<void>;
   archiveEpic: (id: string) => Promise<void>;
 }
@@ -75,6 +77,30 @@ export function EpicsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateEpicOrder = useCallback(async (id: string, order: number) => {
+    setEpics((prev) => prev.map((epic) => (epic.id === id ? { ...epic, order } : epic)));
+    await fetch(`/api/epics/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    });
+  }, []);
+
+  const reorderEpics = useCallback(async (orderedIds: string[]) => {
+    // orderedIds is only the currently-visible (filtered) subset, not the full epics list —
+    // update order in place rather than replacing `epics` wholesale, or any archived/filtered-out
+    // epic would be dropped from context state until the next full refresh().
+    setEpics((prev) => {
+      const orderById = new Map(orderedIds.map((id, index) => [id, index * ORDER_GAP]));
+      return prev.map((epic) => (orderById.has(epic.id) ? { ...epic, order: orderById.get(epic.id)! } : epic));
+    });
+    await fetch('/api/epics/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: orderedIds }),
+    });
+  }, []);
+
   const deleteEpic = useCallback(async (id: string) => {
     await fetch(`/api/epics/${id}`, { method: 'DELETE' });
     setEpics((prev) => prev.filter((epic) => epic.id !== id));
@@ -90,7 +116,9 @@ export function EpicsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <EpicsContext.Provider value={{ epics, refresh, createEpic, updateEpic, deleteEpic, archiveEpic }}>
+    <EpicsContext.Provider
+      value={{ epics, refresh, createEpic, updateEpic, updateEpicOrder, reorderEpics, deleteEpic, archiveEpic }}
+    >
       {children}
     </EpicsContext.Provider>
   );

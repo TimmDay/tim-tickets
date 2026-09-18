@@ -1,4 +1,4 @@
-import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme } from '../types';
+import { DEFAULT_EPIC_COLOR_THEME, Epic, EpicColorTheme, ORDER_GAP } from '../types';
 import { commitInChunks, DocSnapshotLike, FirestoreLike, WriteBatchLike } from './client';
 
 function toEpic(doc: DocSnapshotLike): Epic {
@@ -13,6 +13,7 @@ function toEpic(doc: DocSnapshotLike): Epic {
     startedAt: (data.startedAt as string | null) ?? null,
     completedAt: (data.completedAt as string | null) ?? null,
     createdAt: data.createdAt as string,
+    order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
   };
 }
 
@@ -21,6 +22,7 @@ export interface UpdateEpicInput {
   description?: string;
   colorTheme?: EpicColorTheme;
   repoUrl?: string | null;
+  order?: number;
 }
 
 export function createEpicsRepo(db: FirestoreLike) {
@@ -52,6 +54,7 @@ export function createEpicsRepo(db: FirestoreLike) {
       startedAt: null,
       completedAt: null,
       createdAt: now,
+      order: Date.now(),
     };
     const ref = await epicsCollection().add(data);
     return { id: ref.id, ...data };
@@ -59,6 +62,15 @@ export function createEpicsRepo(db: FirestoreLike) {
 
   async function updateEpic(id: string, input: UpdateEpicInput): Promise<void> {
     await epicsCollection().doc(id).update({ ...input });
+  }
+
+  /** Rebalances the given epics to evenly-spaced order values. Only needed when
+   * fractional-index gaps between neighbors have collapsed too far to bisect. */
+  async function reorderEpics(orderedIds: string[]): Promise<void> {
+    await commitInChunks(
+      db,
+      orderedIds.map((id, index) => (batch) => batch.update(epicsCollection().doc(id), { order: index * ORDER_GAP })),
+    );
   }
 
   async function deleteEpic(id: string): Promise<void> {
@@ -92,7 +104,7 @@ export function createEpicsRepo(db: FirestoreLike) {
     await commitInChunks(db, mutations);
   }
 
-  return { getEpics, createEpic, updateEpic, deleteEpic, archiveEpic };
+  return { getEpics, createEpic, updateEpic, reorderEpics, deleteEpic, archiveEpic };
 }
 
 export type EpicsRepo = ReturnType<typeof createEpicsRepo>;

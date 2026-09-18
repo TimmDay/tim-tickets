@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { ORDER_GAP } from '../../types';
 import { createEpicsRepo } from '../epics';
 import { createTicketsRepo } from '../tickets';
 import { createFakeFirestore } from './fakeFirestore';
-import { EPIC_A_ID, seedFirestore } from './fixtures';
+import { EPIC_A_ID, EPIC_B_ID, seedFirestore } from './fixtures';
+
+describe('epicsRepo.reorderEpics', () => {
+  it('rebalances the given epics to evenly-spaced order values in the given sequence', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createEpicsRepo(db);
+
+    await repo.reorderEpics([EPIC_B_ID, EPIC_A_ID]);
+
+    const epicBDoc = await db.collection('epics').doc(EPIC_B_ID).get();
+    const epicADoc = await db.collection('epics').doc(EPIC_A_ID).get();
+    expect(epicBDoc.data()?.order).toBe(0);
+    expect(epicADoc.data()?.order).toBe(ORDER_GAP);
+  });
+});
 
 describe('epicsRepo.archiveEpic', () => {
   it('archives the epic and every member ticket, regardless of status', async () => {

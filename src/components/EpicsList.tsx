@@ -1,14 +1,19 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useEpics } from '@/lib/EpicsContext';
+import { computeReorder } from '@/lib/ordering';
 import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { useTapTooltip } from '@/lib/useTapTooltip';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { EpicModal } from './EpicModal';
 import { FilterInput } from './FilterInput';
+import { GripIcon } from './GripIcon';
 import { LinkIcon } from './LinkIcon';
 import { PencilIcon } from './PencilIcon';
 import { TrashIcon } from './TrashIcon';
@@ -23,7 +28,7 @@ interface EpicsListProps {
 }
 
 export function EpicsList({ ticketCounts }: EpicsListProps) {
-  const { epics, deleteEpic, archiveEpic } = useEpics();
+  const { epics, deleteEpic, archiveEpic, reorderEpics, updateEpicOrder } = useEpics();
   const [editingEpic, setEditingEpic] = useState<Epic | null>(null);
   const [deletingEpic, setDeletingEpic] = useState<Epic | null>(null);
   const [archivingEpic, setArchivingEpic] = useState<Epic | null>(null);
@@ -37,8 +42,27 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
     return epics
       .filter((epic) => showArchived || !epic.isArchived)
       .filter((epic) => !query || epic.name.toLowerCase().includes(query))
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      .sort((a, b) => a.order - b.order);
   }, [epics, showArchived, filterText]);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = displayedEpics.findIndex((epic) => epic.id === active.id);
+    const newIndex = displayedEpics.findIndex((epic) => epic.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const moved = arrayMove(displayedEpics, oldIndex, newIndex);
+    const { persist } = computeReorder(moved, active.id as string);
+
+    if (persist.kind === 'bulk') {
+      await reorderEpics(persist.orderedIds);
+    } else {
+      await updateEpicOrder(persist.id, persist.order);
+    }
+  }
 
   async function confirmDelete() {
     if (!deletingEpic) return;
@@ -91,38 +115,43 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
       </div>
 
       <div className="lg:min-h-0 lg:flex-1 lg:overflow-auto">
-        {/* Desktop: table */}
+        {/* Desktop: table with drag-reorder */}
         <div className="hidden rounded-lg border border-gray-200 lg:block dark:border-gray-800">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-              <tr>
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Started</th>
-                <th className="px-3 py-2 font-medium">Completed</th>
-                <th className="px-3 py-2 font-medium">Tickets</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {displayedEpics.map((epic) => (
-                <EpicRow
-                  key={epic.id}
-                  epic={epic}
-                  ticketCount={ticketCounts[epic.id] ?? 0}
-                  onEdit={() => setEditingEpic(epic)}
-                  onDelete={() => setDeletingEpic(epic)}
-                  onArchive={() => setArchivingEpic(epic)}
-                />
-              ))}
-              {displayedEpics.length === 0 && (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-left text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
-                    No epics yet.
-                  </td>
+                  <th className="w-8 px-2 py-2" />
+                  <th className="px-3 py-2 font-medium">Name</th>
+                  <th className="px-3 py-2 font-medium">Started</th>
+                  <th className="px-3 py-2 font-medium">Completed</th>
+                  <th className="px-3 py-2 font-medium">Tickets</th>
+                  <th className="px-3 py-2 font-medium" />
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <SortableContext items={displayedEpics.map((epic) => epic.id)} strategy={verticalListSortingStrategy}>
+                <tbody>
+                  {displayedEpics.map((epic) => (
+                    <SortableEpicRow
+                      key={epic.id}
+                      epic={epic}
+                      ticketCount={ticketCounts[epic.id] ?? 0}
+                      onEdit={() => setEditingEpic(epic)}
+                      onDelete={() => setDeletingEpic(epic)}
+                      onArchive={() => setArchivingEpic(epic)}
+                    />
+                  ))}
+                  {displayedEpics.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                        No epics yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </SortableContext>
+            </table>
+          </DndContext>
         </div>
 
         {/* Mobile: scrollable list of cards */}
@@ -177,9 +206,26 @@ interface EpicRowProps {
   onArchive: () => void;
 }
 
-function EpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProps) {
+function SortableEpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: epic.id });
+
   return (
-    <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60">
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60 ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <td className="px-2 py-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="flex cursor-grab items-center justify-center text-gray-400 hover:text-gray-600 active:cursor-grabbing dark:text-gray-500 dark:hover:text-gray-300"
+          title="Drag to reorder"
+        >
+          <GripIcon className="h-4 w-4" />
+        </button>
+      </td>
       <td className="px-3 py-2 font-medium">
         <Link
           href={`/?jogId=${ALL_JOGS_ID}&epicId=${epic.id}`}

@@ -36,6 +36,7 @@ export const fixtureEpics: Record<string, Record<string, unknown>> = {
     startedAt: null,
     completedAt: null,
     createdAt: '2025-12-01T00:00:00.000Z',
+    order: 0,
   },
   [EPIC_B_ID]: {
     name: 'Epic B',
@@ -45,6 +46,7 @@ export const fixtureEpics: Record<string, Record<string, unknown>> = {
     startedAt: '2025-12-20T00:00:00.000Z',
     completedAt: null,
     createdAt: '2025-12-02T00:00:00.000Z',
+    order: 1,
   },
 };
 

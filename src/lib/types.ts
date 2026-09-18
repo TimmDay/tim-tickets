@@ -94,6 +94,7 @@ export interface Epic {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  order: number;
 }
 
 export interface EpicColorThemeOption {

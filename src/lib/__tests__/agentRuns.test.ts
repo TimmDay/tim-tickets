@@ -24,6 +24,7 @@ const epic = (overrides: Partial<Epic>): Epic => ({
   startedAt: null,
   completedAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
+  order: 0,
   ...overrides,
 });
 

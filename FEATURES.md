@@ -45,7 +45,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - An epic can have an optional **GitHub repo** URL (validated as `github.com/owner/repo`, stored normalized). When set, a link icon next to the epic's name opens the repo. This is the repo that agents triggered for the epic's tickets act on (see "Release the bots").
 - Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
 - Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
-- No manual reorder — epics aren't sequenced like jogs, so the list has no drag handle.
+- Drag rows via a grip handle to reorder (persisted, always active — no competing sort/filter here, same as the Jogs list).
 - At `lg` and up, the table fills the full remaining viewport height and scrolls internally; below `lg`, it scrolls with the rest of the page instead (see the full-height layout note below).
 
 ### Global "+ Add" button
@@ -115,7 +115,7 @@ interface Ticket {
 
 ## Epic Fields
 
-Name plus a lifecycle flag; no manual ordering — epics are grouped by topic, not sequenced in time like jogs. `startedAt` is stamped automatically (not user-set) the first time any member ticket's status moves off `todo` (set in `updateTicket`, once — never overwritten after). `completedAt` is stamped when the epic is archived.
+Name plus a lifecycle flag and a manual `order` (drag-reordered on the Epics page, same fractional-index mechanism as jogs/tickets — see "Ordering mechanism" below). `startedAt` is stamped automatically (not user-set) the first time any member ticket's status moves off `todo` (set in `updateTicket`, once — never overwritten after). `completedAt` is stamped when the epic is archived.
 
 ```ts
 type EpicColorTheme = 'indigo' | 'blue' | 'emerald' | 'rose' | 'amber';
@@ -130,6 +130,7 @@ interface Epic {
   startedAt: string | null;   // ISO; auto-set once, first ticket to leave `todo`
   completedAt: string | null; // ISO; set when the epic is archived
   createdAt: string;          // ISO
+  order: number;              // manual ordering on the Epics page
 }
 ```
 
@@ -160,7 +161,7 @@ Every ticket always belongs to a jog. "Default Jog" is guaranteed to exist via a
 
 ## Ordering mechanism
 
-`order` is a fractional index (`src/lib/ordering.ts`), not a sequential position. On drag, only the moved item is given a new value — the midpoint between its new neighbors' `order` values — and persisted via a single `PATCH` to that one ticket/jog. This avoids rewriting every document on every drag (the original implementation renumbered the whole list each time). If repeated inserts into the same slot ever shrink a gap below floating-point precision, that's detected (`needsRebalance`) and falls back to a full renumber via the `/api/tickets/reorder` / `/api/jogs/reorder` bulk endpoints, spacing everything back out by `ORDER_GAP` — an edge case that shouldn't occur in normal use (verified it takes 1000+ repeated same-slot inserts to trigger).
+`order` is a fractional index (`src/lib/ordering.ts`), not a sequential position. On drag, only the moved item is given a new value — the midpoint between its new neighbors' `order` values — and persisted via a single `PATCH` to that one ticket/jog/epic. This avoids rewriting every document on every drag (the original implementation renumbered the whole list each time). If repeated inserts into the same slot ever shrink a gap below floating-point precision, that's detected (`needsRebalance`) and falls back to a full renumber via the `/api/tickets/reorder` / `/api/jogs/reorder` / `/api/epics/reorder` bulk endpoints, spacing everything back out by `ORDER_GAP` — an edge case that shouldn't occur in normal use (verified it takes 1000+ repeated same-slot inserts to trigger).
 
 ## Auth Flow
 

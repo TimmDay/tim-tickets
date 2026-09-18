@@ -15,12 +15,20 @@ import { EpicChip } from './EpicChip';
 import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
 import { JogSelect } from './JogSelect';
+import { PlusIcon } from './PlusIcon';
 import { TicketModal } from './TicketModal';
 import { TrashIcon } from './TrashIcon';
 import { Epic, STATUSES, Ticket } from '@/lib/types';
 
 type SortKey = 'manual' | 'title' | 'jog' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
+
+function formatDueDate(value: string): string {
+  // Parse as a local date — `new Date('2026-09-16')` would be UTC midnight and can show the
+  // previous day in negative-offset timezones.
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 
 export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs, defaultJogId } = useJogs();
@@ -50,6 +58,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [deletingTicket, setDeletingTicket] = useState<Ticket | null>(null);
+  const [creatingTicket, setCreatingTicket] = useState(false);
   const { showArchived, setShowArchived } = useShowArchived();
 
   const jogNameById = useMemo(() => new Map(jogs.map((jog) => [jog.id, jog.name])), [jogs]);
@@ -312,6 +321,15 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
         </div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setCreatingTicket(true)}
+        aria-label="Add ticket"
+        className="fixed bottom-4 left-1/2 z-30 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-gray-900/90 text-white shadow-lg hover:bg-gray-900 lg:hidden dark:bg-gray-100/90 dark:text-gray-900 dark:hover:bg-gray-100"
+      >
+        <PlusIcon className="h-5 w-5" />
+      </button>
+
       {editingTicket && (
         <TicketModal
           ticket={editingTicket}
@@ -320,6 +338,8 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
           onDeleted={handleDeleted}
         />
       )}
+
+      {creatingTicket && <TicketModal onClose={() => setCreatingTicket(false)} onSaved={handleSaved} />}
 
       {deletingTicket && (
         <ConfirmModal
@@ -397,7 +417,10 @@ function SortableTicketRow({
       <td className="px-3 py-2">
         <JogSelect value={ticket.jogId} onChange={onReassign} className="w-48" />
       </td>
-      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{new Date(ticket.createdAt).toLocaleDateString()}</td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">
+        <div>{new Date(ticket.createdAt).toLocaleDateString()}</div>
+        {ticket.dueDate && <div className="text-xs">Due {formatDueDate(ticket.dueDate)}</div>}
+      </td>
       <td className="px-2 py-2 text-right">
         <div className="flex items-center justify-end gap-2">
           <button
@@ -485,6 +508,11 @@ function BacklogCard({ ticket, statusLabel, epic, onEdit, onDelete, onReassign, 
           </span>
         )}
         <span className="text-gray-400 dark:text-gray-500">{new Date(ticket.createdAt).toLocaleDateString()}</span>
+        {ticket.dueDate && (
+          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+            Due {formatDueDate(ticket.dueDate)}
+          </span>
+        )}
       </div>
       <div className="mt-2">
         <JogSelect value={ticket.jogId} onChange={onReassign} className="w-full" />

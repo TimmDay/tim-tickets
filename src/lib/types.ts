@@ -158,7 +158,7 @@ export const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 'high', label: 'High' },
 ];
 
-export const BASE_TAGS = ['Dev', 'EH OI', 'Life admin', 'Career', 'Travel', 'Fun', 'Fitness', 'Social'];
+export const BASE_TAGS = ['Dev', 'EH OI', 'Life admin', 'Learn', 'Fun', 'Career', 'Travel', 'Fitness', 'Social'];
 
 export const DEFAULT_JOG_NAME = 'backlog';
 

@@ -19,6 +19,13 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 
 const POPOVER_WIDTH = 224; // matches w-56
 
+function formatDueDate(value: string): string {
+  // Parse as a local date — `new Date('2026-09-16')` would be UTC midnight and can show the
+  // previous day in negative-offset timezones.
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
 export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
   const { epics } = useEpics();
   const epic = epics.find((epic) => epic.id === ticket.epicId);
@@ -114,6 +121,14 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
             className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
           >
             🤖 no report
+          </span>
+        )}
+        {ticket.dueDate && (
+          <span
+            title={`Due ${formatDueDate(ticket.dueDate)}`}
+            className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+          >
+            Due {formatDueDate(ticket.dueDate)}
           </span>
         )}
         {ticket.tags.map((tag) => (

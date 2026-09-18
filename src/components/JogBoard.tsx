@@ -31,7 +31,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [releasingBots, setReleasingBots] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const { showArchived, setShowArchived } = useShowArchived();
+  const { showArchived } = useShowArchived();
   const [epicFilter, setEpicFilter] = useState('all');
   const hasRestoredSelection = useRef(false);
 
@@ -271,15 +271,6 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
           >
             EH OI
           </button>
-          <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
-              className="tt-checkbox"
-            />
-            Show archived
-          </label>
         </div>
         <FilterInput value={filterText} onChange={setFilterText} placeholder="Filter by title or tag…" />
       </div>
@@ -337,20 +328,11 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
         >
           EH OI
         </button>
-        <label className="ml-auto flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => setShowArchived(event.target.checked)}
-            className="tt-checkbox"
-          />
-          Show archived
-        </label>
         <FilterInput
           value={filterText}
           onChange={setFilterText}
           placeholder="Filter by title or tag…"
-          desktopWidthClassName="lg:w-44"
+          desktopWidthClassName="lg:w-44 ml-auto"
         />
       </div>
 

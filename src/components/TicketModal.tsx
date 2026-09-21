@@ -561,7 +561,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
             <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Comments</h3>
             <ul className="mb-2 max-h-40 space-y-2 overflow-y-auto">
               {comments.length === 0 && <li className="text-sm text-gray-400 dark:text-gray-500">No comments yet.</li>}
-              {comments.map((comment) => (
+              {[...comments].reverse().map((comment) => (
                 <li key={comment.id} className="relative rounded-md bg-gray-50 p-2 pr-7 text-sm dark:bg-gray-800">
                   <button
                     type="button"

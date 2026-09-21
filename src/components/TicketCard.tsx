@@ -148,7 +148,7 @@ export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () =>
             onMouseLeave={scheduleHide}
           >
             <ul className="max-h-40 space-y-1.5 overflow-y-auto">
-              {ticket.comments.map((comment) => (
+              {[...ticket.comments].reverse().map((comment) => (
                 <li key={comment.id}>
                   <p className="text-gray-700 dark:text-gray-300">
                     <Linkified text={comment.body} />

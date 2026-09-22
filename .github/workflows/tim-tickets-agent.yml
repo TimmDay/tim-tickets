@@ -118,16 +118,18 @@ jobs:
             branch with Conventional Commit messages. Do not push or open a PR — a later workflow
             step does that. If the ticket is unclear or needs no code change, make no commits.
 
-            If you made commits, write a PR description to ${{ env.AGENT_DIR }}/pr-body.md
-            explaining what changed and why, in a few short paragraphs or a short bullet list.
-            Then run /unslop on ${{ env.AGENT_DIR }}/pr-body.md to strip AI writing tells before
-            you finish. Skip this file entirely if you made no commits.
-
             If you find that everything the ticket asks for is ALREADY implemented in this
             repository, make no commits and instead write the file .tim-tickets/result.json
             containing exactly: {"outcome": "already_done", "reason": "<one or two sentences
             saying where and how it is already implemented>"}. Only do this when you have checked
             the code and are confident; if just some of it exists, implement the rest instead.
+
+            If you made any commits, also write ${{ env.AGENT_DIR }}/pr-description.md: a PR
+            description with a "## Summary" section (1-3 bullet points on what changed and why,
+            in terms of the ticket) and, if there's a meaningful way to verify the change, a
+            "## Test plan" section (bulleted checklist — commands you ran, or manual steps). Base
+            it on the ticket and the diff you produced, not a restatement of the file list. Then
+            run /unslop on that file to strip AI writing tells before you finish.
 
       - name: Open PR
         id: pr
@@ -145,15 +147,19 @@ jobs:
             exit 0
           fi
           git push -u origin "${{ steps.branch.outputs.name }}"
-          body_file="$AGENT_DIR/pr-body.md"
-          if [ ! -s "$body_file" ]; then
-            # Claude didn't write one (unexpected, given it made commits); fall back.
-            body_file="$AGENT_DIR/pr-body-fallback.md"
-            printf 'Automated implementation of %s.\n' "$TICKET_KEY" > "$body_file"
+
+          # Prefer the description Claude wrote (it has the ticket + diff context an
+          # after-the-fact summary can't fake); a stable footer is appended either way so
+          # every PR is traceable back to its run regardless of what Claude wrote.
+          footer=$(printf 'Automated implementation of %s. Workflow run: %s' "$TICKET_KEY" "$RUN_URL")
+          if [ -s "$AGENT_DIR/pr-description.md" ]; then
+            printf '%s\n\n---\n%s\n' "$(cat "$AGENT_DIR/pr-description.md")" "$footer" > "$AGENT_DIR/pr-body.md"
+          else
+            printf '%s\n' "$footer" > "$AGENT_DIR/pr-body.md"
           fi
-          printf '\n\n---\nWorkflow run: %s\n' "$RUN_URL" >> "$body_file"
+
           pr_url=$(gh pr create --base "$BASE_BRANCH" --title "${TICKET_KEY}: ${TICKET_TITLE}" \
-            --body-file "$body_file")
+            --body-file "$AGENT_DIR/pr-body.md")
           echo "outcome=pr_opened" >> "$GITHUB_OUTPUT"
           echo "url=$pr_url" >> "$GITHUB_OUTPUT"
 

@@ -24,6 +24,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Only needed for the optional Opus review step (claude-code-action's code-review plugin).
+  issues: read
+  id-token: write
 
 # One run per ticket at a time; a re-dispatch waits for the previous run rather than racing it.
 concurrency:
@@ -162,6 +165,20 @@ jobs:
             --body-file "$AGENT_DIR/pr-body.md")
           echo "outcome=pr_opened" >> "$GITHUB_OUTPUT"
           echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "number=${pr_url##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Opus code review
+        # Only when the ticket asked for one ("Release the bots" checkbox) and a PR actually
+        # opened -- there's nothing to review for already_done/no_changes/failed outcomes.
+        if: steps.pr.outputs.outcome == 'pr_opened' && github.event.client_payload.requestOpusReview == true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'code-review@claude-code-plugins'
+          prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ steps.pr.outputs.number }}'
+          claude_args: '--model claude-opus-5 --allowedTools "mcp__github_inline_comment__create_inline_comment"'
 
       - name: Report back to tim-tickets
         if: always()

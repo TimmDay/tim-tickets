@@ -16,6 +16,23 @@ tim-tickets (Vercel) ◀──TIM_TICKETS_AGENT_TOKEN── workflow reports bac
                                              preview Deployment Protection)
 ```
 
+## Epic repos
+
+Repos with the agent workflow installed (`.github/workflows/tim-tickets-agent.yml`, copied from
+`docs/agent-workflow.yml` in this repo). Update this table whenever you copy `docs/agent-workflow.yml`
+or `docs/agent-merged-workflow.yml` into a repo, or merge a PR that does — otherwise the next
+change to the template silently misses whichever repos aren't listed here.
+
+| Repo | Merged workflow | Unslop skill | Last synced |
+|---|---|---|---|
+| tim-tickets (this repo) | Yes | Yes | 2026-09-22, PR #33 |
+| coin-cabinet | Yes | Yes | 2026-09-22, branch `ci/agent-pr-description-unslop` (PR not yet opened) |
+| architecture-simulator | Yes | Yes | 2026-09-22, branch `ci/agent-pr-description-unslop` (PR not yet opened) |
+| somnus-data-ingestion | Yes | Yes | 2026-09-22, branch `ci/add-tim-tickets-agent-workflow` (newly added; PR not yet opened; repo secrets/variables not yet confirmed) |
+
+"Merged workflow" means both `tim-tickets-agent.yml` and `tim-tickets-agent-merged.yml` are present
+(the second moves tickets to Done when the agent's PR merges).
+
 ## Inventory
 
 | Secret | Lives in | Used for | Expires? |

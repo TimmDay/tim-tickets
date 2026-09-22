@@ -47,6 +47,9 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
     const backlog = backlogAdditions(toSend, [...backlogSelection.eligible, ...backlogSelection.alreadyDispatched]);
     return new Set([...toSend, ...backlog].map((c) => c.ticket.id));
   });
+  // Which selected tickets should also get an independent Opus review once their PR opens.
+  // A ticket dropped from selectedIds is dropped here too (see handleToggleTicket/handleToggleAll).
+  const [opusReviewIds, setOpusReviewIds] = useState<Set<string>>(new Set());
   // Pre-flight: which target repos can actually run a dispatch (see RepoAgentReadiness).
   // null while checking. A failed check leaves it empty rather than blocking — the dispatch
   // route re-checks and refuses unready repos itself.
@@ -102,11 +105,31 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
       setSelectedIds(new Set(sendable.map((c) => c.ticket.id)));
     } else {
       setSelectedIds(new Set());
+      setOpusReviewIds(new Set());
     }
   };
 
   const handleToggleTicket = (ticketId: string) => {
     setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticketId)) {
+        next.delete(ticketId);
+      } else {
+        next.add(ticketId);
+      }
+      return next;
+    });
+    // Requesting a review only makes sense for a ticket that's actually being dispatched.
+    setOpusReviewIds((prev) => {
+      if (!prev.has(ticketId)) return prev;
+      const next = new Set(prev);
+      next.delete(ticketId);
+      return next;
+    });
+  };
+
+  const handleToggleOpusReview = (ticketId: string) => {
+    setOpusReviewIds((prev) => {
       const next = new Set(prev);
       if (next.has(ticketId)) {
         next.delete(ticketId);
@@ -129,6 +152,7 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
           includeDispatched,
           includeBacklog,
           selectedIds: selectedToSend.map((c) => c.ticket.id),
+          opusReviewIds: selectedToSend.filter((c) => opusReviewIds.has(c.ticket.id)).map((c) => c.ticket.id),
         }),
       });
       if (!response.ok) {
@@ -148,7 +172,7 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
+        className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -210,6 +234,8 @@ export function ReleaseBotsModal({ jogId, tickets, epics, jogs = [], onClose, on
                       candidate={candidate}
                       checked={!isBlocked(candidate) && selectedIds.has(candidate.ticket.id)}
                       onToggle={() => handleToggleTicket(candidate.ticket.id)}
+                      opusReviewChecked={opusReviewIds.has(candidate.ticket.id)}
+                      onToggleOpusReview={() => handleToggleOpusReview(candidate.ticket.id)}
                       setupProblem={describeRepoReadiness(candidate.repo, readiness?.[repoKey(candidate.repo)])}
                       isFromBacklog={jogId !== ALL_JOGS_ID && candidate.ticket.jogId !== jogId}
                       jogName={jogs.find((j) => j.id === candidate.ticket.jogId)?.name}
@@ -274,6 +300,8 @@ function CandidateRow({
   candidate: { ticket, repo },
   checked,
   onToggle,
+  opusReviewChecked,
+  onToggleOpusReview,
   setupProblem,
   isFromBacklog,
   jogName,
@@ -281,6 +309,9 @@ function CandidateRow({
   candidate: AgentRunCandidate;
   checked: boolean;
   onToggle: () => void;
+  /** Whether this ticket's PR should get an independent Opus review once it opens. */
+  opusReviewChecked: boolean;
+  onToggleOpusReview: () => void;
   /** Why this ticket's repo can't run agents; its row can't be selected while set. */
   setupProblem: string | null;
   /** Whether this ticket is from the backlog (different jog). */
@@ -297,18 +328,37 @@ function CandidateRow({
         setupProblem ? 'border-red-200 dark:border-red-900/60' : 'border-gray-200 dark:border-gray-700'
       } ${isFromBacklog ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}
     >
-      <label className={`flex items-baseline gap-2 ${setupProblem ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onToggle}
-          disabled={Boolean(setupProblem)}
-          className="tt-checkbox shrink-0"
-        />
-        <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">{ticket.key}</span>
-        <span className="truncate text-gray-900 dark:text-gray-100">{ticket.title}</span>
-        {isFromBacklog && <span className="shrink-0 rounded px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">{jogName ?? 'Backlog'}</span>}
-      </label>
+      <div className="flex items-baseline justify-between gap-2">
+        <label
+          className={`flex min-w-0 flex-1 items-baseline gap-2 ${setupProblem ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+        >
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggle}
+            disabled={Boolean(setupProblem)}
+            className="tt-checkbox shrink-0"
+          />
+          <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">{ticket.key}</span>
+          <span className="truncate text-gray-900 dark:text-gray-100">{ticket.title}</span>
+          {isFromBacklog && <span className="shrink-0 rounded px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">{jogName ?? 'Backlog'}</span>}
+        </label>
+        <label
+          title="Request an independent Opus code review once this ticket's PR opens"
+          className={`flex shrink-0 items-center gap-1 text-xs ${
+            checked ? 'cursor-pointer text-gray-500 dark:text-gray-400' : 'cursor-not-allowed opacity-40'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={opusReviewChecked}
+            onChange={onToggleOpusReview}
+            disabled={!checked}
+            className="tt-checkbox shrink-0"
+          />
+          Opus review
+        </label>
+      </div>
       <div className="text-xs text-gray-500 dark:text-gray-400">
         {repo.owner}/{repo.name} · {modelLabel}
         {overdue && (

@@ -24,6 +24,8 @@ const agentRunSchema = z.object({
   includeBacklog: z.boolean().default(false),
   /** IDs of specific tickets to dispatch (subset of eligible). */
   selectedIds: z.array(z.string()).default([]),
+  /** Subset of selectedIds to also request an independent Opus code review for. */
+  opusReviewIds: z.array(z.string()).default([]),
 });
 
 /** "Release the bots": dispatches a GitHub workflow run for every eligible ticket in the jog. */
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
 
   const selectedIdSet = new Set(parsed.data.selectedIds);
   const candidates = selectedIdSet.size > 0 ? allCandidates.filter((c) => selectedIdSet.has(c.ticket.id)) : allCandidates;
+  const opusReviewIdSet = new Set(parsed.data.opusReviewIds);
 
   // Move backlog tickets (not already in the selected jog) to the selected jog before dispatching.
   // Compute new order values for backlog tickets: after any existing tickets in the target jog.
@@ -89,6 +92,7 @@ export async function POST(request: Request) {
       if (blocksDispatch(repoReadiness)) {
         return { key: ticket.key, ok: false as const, error: describeRepoReadiness(repo, repoReadiness)! };
       }
+      const requestOpusReview = opusReviewIdSet.has(ticket.id);
       try {
         await sendRepositoryDispatch(repo, AGENT_DISPATCH_EVENT_TYPE, {
           ticketKey: ticket.key,
@@ -101,8 +105,9 @@ export async function POST(request: Request) {
           model: ticket.agentModel ?? '',
           reportUrl: `${reportBaseUrl}/api/agent/tickets/${ticket.key}/report`,
           // Empty when there's no screenshot; the workflow downloads it with the agent token.
-          // (Payload is 9 of GitHub's 10 allowed top-level keys — nest anything further.)
           screenshotUrl: ticket.screenshot ? `${reportBaseUrl}/api/agent/tickets/${ticket.key}/screenshot` : '',
+          // (Payload is at GitHub's 10 allowed top-level keys — nest anything further.)
+          requestOpusReview,
         });
       } catch (error) {
         return { key: ticket.key, ok: false as const, error: error instanceof Error ? error.message : String(error) };
@@ -116,7 +121,9 @@ export async function POST(request: Request) {
       });
       await ticketsRepo.addComment(
         ticket.id,
-        `${AGENT_COMMENT_PREFIX} Agent dispatched to ${toGithubRepoUrl(repo).replace('https://github.com/', '')} (${modelLabel})`,
+        `${AGENT_COMMENT_PREFIX} Agent dispatched to ${toGithubRepoUrl(repo).replace('https://github.com/', '')} (${modelLabel})${
+          requestOpusReview ? ', Opus review requested' : ''
+        }`,
       );
       return { key: ticket.key, ok: true as const };
     }),

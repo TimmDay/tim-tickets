@@ -94,7 +94,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: >-
             ${{ github.event.client_payload.model && format('--model {0}', github.event.client_payload.model) || '' }}
-            --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(npm:*),Bash(npx:*),Edit,Write,Read,Glob,Grep"
+            --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(npm:*),Bash(npx:*),Edit,Write,Read,Glob,Grep,Skill"
           prompt: |
             You are working on ticket ${{ github.event.client_payload.ticketKey }} from a personal issue tracker.
 
@@ -118,6 +118,11 @@ jobs:
             branch with Conventional Commit messages. Do not push or open a PR — a later workflow
             step does that. If the ticket is unclear or needs no code change, make no commits.
 
+            If you made commits, write a PR description to ${{ env.AGENT_DIR }}/pr-body.md
+            explaining what changed and why, in a few short paragraphs or a short bullet list.
+            Then run /unslop on ${{ env.AGENT_DIR }}/pr-body.md to strip AI writing tells before
+            you finish. Skip this file entirely if you made no commits.
+
             If you find that everything the ticket asks for is ALREADY implemented in this
             repository, make no commits and instead write the file .tim-tickets/result.json
             containing exactly: {"outcome": "already_done", "reason": "<one or two sentences
@@ -140,8 +145,15 @@ jobs:
             exit 0
           fi
           git push -u origin "${{ steps.branch.outputs.name }}"
+          body_file="$AGENT_DIR/pr-body.md"
+          if [ ! -s "$body_file" ]; then
+            # Claude didn't write one (unexpected, given it made commits); fall back.
+            body_file="$AGENT_DIR/pr-body-fallback.md"
+            printf 'Automated implementation of %s.\n' "$TICKET_KEY" > "$body_file"
+          fi
+          printf '\n\n---\nWorkflow run: %s\n' "$RUN_URL" >> "$body_file"
           pr_url=$(gh pr create --base "$BASE_BRANCH" --title "${TICKET_KEY}: ${TICKET_TITLE}" \
-            --body "Automated implementation of ${TICKET_KEY}. Workflow run: ${RUN_URL}")
+            --body-file "$body_file")
           echo "outcome=pr_opened" >> "$GITHUB_OUTPUT"
           echo "url=$pr_url" >> "$GITHUB_OUTPUT"
 

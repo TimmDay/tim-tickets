@@ -73,6 +73,10 @@ export function getFirestore(): FirestoreLike {
   firestore = new Firestore({
     projectId,
     credentials: { client_email: clientEmail, private_key: privateKey },
+    // REST over HTTP/1.1 instead of gRPC for everything except realtime listeners (which this
+    // app doesn't use). On serverless, gRPC's channel setup is a big part of every cold start;
+    // REST skips it.
+    preferRest: true,
   });
   return firestore;
 }

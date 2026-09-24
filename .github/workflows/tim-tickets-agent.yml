@@ -161,6 +161,18 @@ jobs:
             printf '%s\n' "$footer" > "$AGENT_DIR/pr-body.md"
           fi
 
+          # If the ticket had a screenshot, link back to it rather than embedding it: GitHub's
+          # markdown renderer fetches inline images anonymously, with no way to authenticate
+          # against tim-tickets' password gate, so the only way to actually show the pixels in
+          # the PR body would be committing a copy into this repo -- not something that belongs
+          # here. A plain link instead opens as the reviewer's own browser request, carrying
+          # their own tim-tickets session. Only good until the ticket reaches done (tim-tickets
+          # deletes its screenshot then), which is fine: review happens before merge.
+          if [ -n "${{ steps.screenshot.outputs.path }}" ]; then
+            ticket_url="${REPORT_URL%/api/agent/tickets/*}/tickets/${TICKET_KEY}"
+            printf '\nScreenshot: %s (opens the ticket in tim-tickets; login required)\n' "$ticket_url" >> "$AGENT_DIR/pr-body.md"
+          fi
+
           pr_url=$(gh pr create --base "$BASE_BRANCH" --title "${TICKET_KEY}: ${TICKET_TITLE}" \
             --body-file "$AGENT_DIR/pr-body.md")
           echo "outcome=pr_opened" >> "$GITHUB_OUTPUT"

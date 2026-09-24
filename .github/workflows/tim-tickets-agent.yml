@@ -161,6 +161,23 @@ jobs:
             printf '%s\n' "$footer" > "$AGENT_DIR/pr-body.md"
           fi
 
+          # The ticket's screenshot, if any (downloaded by the "Download screenshot" step into
+          # the git-excluded AGENT_DIR). GitHub only renders an inline image reliably from a URL
+          # it can resolve against a real commit, so it has to be committed -- a relative path in
+          # a PR body resolves against the base branch, not this one, and would 404. Its own
+          # commit keeps it out of Claude's implementation diff.
+          screenshot_path="${{ steps.screenshot.outputs.path }}"
+          if [ -n "$screenshot_path" ]; then
+            dest=".github/agent-run-screenshots/${TICKET_KEY}.${screenshot_path##*.}"
+            mkdir -p "$(dirname "$dest")"
+            cp "$screenshot_path" "$dest"
+            git add "$dest"
+            git commit -m "chore: attach ${TICKET_KEY}'s screenshot for PR review"
+            git push
+            screenshot_url="https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.branch.outputs.name }}/${dest}"
+            printf '\n\n## Screenshot\n\n![Ticket screenshot](%s)\n' "$screenshot_url" >> "$AGENT_DIR/pr-body.md"
+          fi
+
           pr_url=$(gh pr create --base "$BASE_BRANCH" --title "${TICKET_KEY}: ${TICKET_TITLE}" \
             --body-file "$AGENT_DIR/pr-body.md")
           echo "outcome=pr_opened" >> "$GITHUB_OUTPUT"

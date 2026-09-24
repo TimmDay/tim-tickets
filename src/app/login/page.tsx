@@ -1,10 +1,28 @@
 'use client';
 
-import { SubmitEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, SubmitEvent, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+/** Only a same-page-origin path is safe to bounce back to — a bare `next` param is
+ * attacker-controlled (it comes straight off the URL), so an absolute or protocol-relative
+ * value (`https://evil.example`, `//evil.example`) must fall back to the default instead of
+ * being followed. */
+function safeRedirectTarget(next: string | null): string {
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return '/';
+}
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -21,7 +39,7 @@ export default function LoginPage() {
     });
 
     if (response.ok) {
-      router.push('/');
+      router.push(safeRedirectTarget(searchParams.get('next')));
       router.refresh();
     } else if (response.status === 429) {
       setError('Too many attempts. Try again in a bit.');

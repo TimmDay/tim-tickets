@@ -125,8 +125,31 @@ export function createTicketsRepo(db: FirestoreLike) {
     });
   }
 
-  async function getTickets(): Promise<Ticket[]> {
-    const snapshot = await ticketsCollection().orderBy('createdAt', 'asc').get();
+  /** All tickets, oldest first. `includeArchived: false` filters archived tickets out in the
+   * query itself (so Firestore never sends them) — used by the board, the PWA's start page,
+   * which hides archived tickets unless "Show archived" is on. */
+  async function getTickets({ includeArchived = true }: { includeArchived?: boolean } = {}): Promise<Ticket[]> {
+    // The filtered query deliberately has no orderBy: an equality filter plus an orderBy on a
+    // different field would need a composite index. It's sorted in memory below instead.
+    const snapshot = includeArchived
+      ? await ticketsCollection().orderBy('createdAt', 'asc').get()
+      : await ticketsCollection().where('isArchived', '==', false).get();
+
+    // One-off backfill for tickets created before `isArchived` existed. Firestore equality
+    // filters skip docs that lack the field entirely, so without this the filtered board query
+    // would silently hide them. Only the unfiltered read can see such docs; same lazy,
+    // self-healing pattern as the key backfill below.
+    if (includeArchived) {
+      const missingArchivedFlag = snapshot.docs.filter((doc) => typeof doc.data()?.isArchived !== 'boolean');
+      if (missingArchivedFlag.length > 0) {
+        await commitInChunks(
+          db,
+          missingArchivedFlag.map(
+            (doc) => (batch) => batch.update(ticketsCollection().doc(doc.id), { isArchived: false }),
+          ),
+        );
+      }
+    }
 
     // One-off backfill for tickets created before the `key` field existed — same lazy,
     // self-healing pattern as ensureDefaultJog. Only ever touches docs that don't have a key
@@ -144,11 +167,13 @@ export function createTicketsRepo(db: FirestoreLike) {
       );
     }
 
-    return snapshot.docs.map((doc) => {
+    const tickets = snapshot.docs.map((doc) => {
       const ticket = toTicket(doc);
       const backfilledKey = backfilledKeys.get(doc.id);
       return backfilledKey ? { ...ticket, key: backfilledKey } : ticket;
     });
+    if (!includeArchived) tickets.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return tickets;
   }
 
   async function getTicketByKey(key: string): Promise<Ticket | null> {

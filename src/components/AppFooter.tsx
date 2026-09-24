@@ -1,12 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { clearCachedPages } from '@/lib/serviceWorker';
 
 export function AppFooter() {
   const router = useRouter();
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    await clearCachedPages();
     router.push('/login');
   }
 

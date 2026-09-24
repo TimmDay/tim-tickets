@@ -20,9 +20,11 @@ interface JogsContextValue {
 
 const JogsContext = createContext<JogsContextValue | null>(null);
 
-export function JogsProvider({ children }: { children: ReactNode }) {
-  const [jogs, setJogs] = useState<Jog[]>([]);
-  const hasFetched = useRef(false);
+export function JogsProvider({ children, initialJogs }: { children: ReactNode; initialJogs?: Jog[] }) {
+  const [jogs, setJogs] = useState<Jog[]>(initialJogs ?? []);
+  // Server-rendered by the (app) layout in parallel with the page's own data, so the first
+  // client render already has them — the client-side fetch below is only a fallback.
+  const hasFetched = useRef(initialJogs !== undefined);
 
   const refresh = useCallback(async () => {
     const response = await fetch('/api/jogs');
@@ -30,9 +32,9 @@ export function JogsProvider({ children }: { children: ReactNode }) {
     setJogs(data);
   }, []);
 
-  // Fetched once client-side on first mount, rather than server-rendered per navigation —
-  // this provider lives at the layout level and isn't remounted by client-side navigation
-  // between sibling routes, so a single fetch here covers the whole session.
+  // This provider lives at the layout level and isn't remounted by client-side navigation
+  // between sibling routes, so the initial data (or this one fallback fetch) covers the whole
+  // session; `refresh()` re-syncs it on demand.
   useEffect(() => {
     if (hasFetched.current) return;
     hasFetched.current = true;

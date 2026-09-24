@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,7 +42,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           content and scrolls normally, so the footer scrolls into view instead of being
           permanently pinned to the bottom. lg and up keeps the fixed-height shell with each
           page's own internal scroll container. */}
-      <body className="flex min-h-dvh flex-col lg:h-full">{children}</body>
+      <body className="flex min-h-dvh flex-col lg:h-full">
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   );
 }

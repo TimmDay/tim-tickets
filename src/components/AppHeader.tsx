@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { clearCachedPages } from '@/lib/serviceWorker';
 import { ThemeToggle } from './ThemeToggle';
 import { TicketModal } from './TicketModal';
 
@@ -20,6 +21,7 @@ export function AppHeader() {
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    await clearCachedPages();
     router.push('/login');
   }
 

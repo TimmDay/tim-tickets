@@ -22,9 +22,11 @@ interface EpicsContextValue {
 
 const EpicsContext = createContext<EpicsContextValue | null>(null);
 
-export function EpicsProvider({ children }: { children: ReactNode }) {
-  const [epics, setEpics] = useState<Epic[]>([]);
-  const hasFetched = useRef(false);
+export function EpicsProvider({ children, initialEpics }: { children: ReactNode; initialEpics?: Epic[] }) {
+  const [epics, setEpics] = useState<Epic[]>(initialEpics ?? []);
+  // Server-rendered by the (app) layout in parallel with the page's own data, so the first
+  // client render already has them — the client-side fetch below is only a fallback.
+  const hasFetched = useRef(initialEpics !== undefined);
 
   const refresh = useCallback(async () => {
     const response = await fetch('/api/epics');
@@ -32,9 +34,9 @@ export function EpicsProvider({ children }: { children: ReactNode }) {
     setEpics(data);
   }, []);
 
-  // Fetched once client-side on first mount, rather than server-rendered per navigation —
-  // this provider lives at the layout level and isn't remounted by client-side navigation
-  // between sibling routes, so a single fetch here covers the whole session.
+  // This provider lives at the layout level and isn't remounted by client-side navigation
+  // between sibling routes, so the initial data (or this one fallback fetch) covers the whole
+  // session; `refresh()` re-syncs it on demand.
   useEffect(() => {
     if (hasFetched.current) return;
     hasFetched.current = true;

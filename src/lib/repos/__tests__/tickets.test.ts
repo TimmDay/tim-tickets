@@ -24,6 +24,47 @@ describe('ticketsRepo.getTickets', () => {
   });
 });
 
+describe('ticketsRepo.getTickets({ includeArchived: false })', () => {
+  const doc = (overrides: Record<string, unknown>) => ({
+    key: 'T-0',
+    title: 'x',
+    body: '',
+    status: 'todo',
+    jogId: 'jog',
+    tags: [],
+    comments: [],
+    order: 0,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  });
+
+  it('leaves archived tickets out and keeps oldest-first order', async () => {
+    const db = createFakeFirestore({
+      tickets: {
+        late: doc({ key: 'T-2', isArchived: false, createdAt: '2026-02-01T00:00:00.000Z' }),
+        archived: doc({ key: 'T-3', isArchived: true, createdAt: '2026-01-15T00:00:00.000Z' }),
+        early: doc({ key: 'T-1', isArchived: false, createdAt: '2026-01-01T00:00:00.000Z' }),
+      },
+    });
+    const repo = createTicketsRepo(db);
+
+    const tickets = await repo.getTickets({ includeArchived: false });
+
+    expect(tickets.map((t) => t.id)).toEqual(['early', 'late']);
+  });
+
+  it('sees legacy tickets with no isArchived field once an unfiltered read has backfilled them', async () => {
+    const db = createFakeFirestore({
+      tickets: { legacy: doc({ key: 'T-1', createdAt: '2026-01-01T00:00:00.000Z' }) },
+    });
+    const repo = createTicketsRepo(db);
+
+    expect(await repo.getTickets({ includeArchived: false })).toEqual([]);
+    await repo.getTickets();
+    expect((await repo.getTickets({ includeArchived: false })).map((t) => t.id)).toEqual(['legacy']);
+  });
+});
+
 describe('ticketsRepo.updateTicket', () => {
   it("stamps the parent epic's startedAt the first time a ticket leaves todo, and only that once", async () => {
     const db = createFakeFirestore(seedFirestore());

@@ -40,6 +40,23 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     setTickets(initialTickets);
   }
 
+  // The server only sends unarchived tickets (see the board page). When "Show archived" is on,
+  // pull the full list — and again after any server refresh, which resets `tickets` to the
+  // unarchived set.
+  useEffect(() => {
+    if (!showArchived) return;
+    let cancelled = false;
+    fetch('/api/tickets')
+      .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+      .then((all: Ticket[]) => {
+        if (!cancelled) setTickets(all);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showArchived, initialTickets]);
+
   // Resolve the initial jog selection once the jogs list is available. A `jogId` (and/or
   // `epicId`) query param — e.g. from clicking a jog/epic title on the Jogs/Epics pages —
   // takes priority; otherwise default to whichever jog is flagged `isCurrent` (see the Jogs

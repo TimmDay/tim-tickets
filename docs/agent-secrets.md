@@ -25,10 +25,11 @@ change to the template silently misses whichever repos aren't listed here.
 
 | Repo | Merged workflow | Unslop skill | Last synced |
 |---|---|---|---|
-| tim-tickets (this repo) | Yes | Yes | 2026-09-22, PR #33 (merged) |
-| coin-cabinet | Yes | Yes | 2026-09-22, PR #10 (open) |
-| architecture-simulator | Yes | Yes | 2026-09-22, PR #20 (open) |
-| somnus-data-ingestion | Yes | Yes | 2026-09-22, PR #12 (open; newly added — repo secrets/variables not yet confirmed) |
+| tim-tickets (this repo) | Yes | Yes | 2026-09-24, PR #37 (merged; Opus review + screenshot-link) |
+| coin-cabinet | Yes | Yes | 2026-09-24, PR #12 (merged; Opus review + screenshot-link) |
+| architecture-simulator | Yes | Yes | 2026-09-24, PR #23 (merged; Opus review + screenshot-link) |
+| somnus-data-ingestion | Yes | Yes | 2026-09-24, PR #14 (merged; Opus review + screenshot-link) |
+| tim-tchores | Yes | Yes | 2026-09-26, PR #41 (open; newly added — repo secrets/variables not yet confirmed) |
 
 "Merged workflow" means both `tim-tickets-agent.yml` and `tim-tickets-agent-merged.yml` are present
 (the second moves tickets to Done when the agent's PR merges).

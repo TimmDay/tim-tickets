@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { AGENT_MODELS, AgentModel } from '@/lib/types';
+import { AGENT_MODELS, AgentModel, DEFAULT_AGENT_MODEL } from '@/lib/types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface AgentModelSelectProps {
   value: AgentModel | null;
@@ -18,6 +19,8 @@ const DROPDOWN_HEIGHT_ESTIMATE = 150;
 export function AgentModelSelect({ value, onChange }: AgentModelSelectProps) {
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
+  // A pricier model waiting on the user's confirmation before it's applied.
+  const [pendingModel, setPendingModel] = useState<AgentModel | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const options: { value: AgentModel | null; label: string }[] = [{ value: null, label: 'Default' }, ...AGENT_MODELS];
@@ -34,8 +37,14 @@ export function AgentModelSelect({ value, onChange }: AgentModelSelectProps) {
   }
 
   function select(model: AgentModel | null) {
-    onChange(model);
     setOpen(false);
+    // Haiku is the cheap default; Default resolves to it in the workflow. Anything else
+    // costs noticeably more, so make the user say so twice.
+    if (model !== null && model !== DEFAULT_AGENT_MODEL && model !== value) {
+      setPendingModel(model);
+      return;
+    }
+    onChange(model);
   }
 
   return (
@@ -74,6 +83,21 @@ export function AgentModelSelect({ value, onChange }: AgentModelSelectProps) {
             ))}
           </ul>
         </>
+      )}
+
+      {pendingModel && (
+        <div onClick={(event) => event.stopPropagation()}>
+          <ConfirmModal
+            title={`Use ${AGENT_MODELS.find((m) => m.value === pendingModel)?.label ?? 'this model'}?`}
+            message="Agent runs start from scratch: the model re-reads the repo and its docs before writing any code, and a run is many turns of that. Bigger models cost several times more per run than Haiku, which handles most well-scoped tickets. Only pick this for work that needs it."
+            confirmLabel="Use it anyway"
+            onConfirm={() => {
+              onChange(pendingModel);
+              setPendingModel(null);
+            }}
+            onCancel={() => setPendingModel(null)}
+          />
+        </div>
       )}
     </div>
   );

@@ -23,8 +23,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # Only needed for the optional Opus review step (claude-code-action's code-review plugin).
-  issues: read
+  # read: the optional Opus review step (claude-code-action's code-review plugin).
+  # write: filing an issue when a run fails.
+  issues: write
   id-token: write
 
 # One run per ticket at a time; a re-dispatch waits for the previous run rather than racing it.
@@ -62,6 +63,21 @@ jobs:
           mkdir -p "$AGENT_DIR"
           echo "$AGENT_DIR/" >> .git/info/exclude
 
+      # Restores npm's download cache between runs. Keyed on the lockfile, so it only misses
+      # when dependencies change. Works with or without a lockfile (unlike setup-node's cache).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      # Installing here means Claude doesn't spend turns (and tokens) on it.
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          fi
+
       - name: Download screenshot
         id: screenshot
         if: github.event.client_payload.screenshotUrl != ''
@@ -91,11 +107,16 @@ jobs:
           echo "path=$dir/screenshot.$ext" >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Haiku unless the ticket asks otherwise. --max-turns stops a confused run from looping
+          # until the 60-minute timeout; whatever it committed by then is kept (see the failure
+          # issue step).
           claude_args: >-
-            ${{ github.event.client_payload.model && format('--model {0}', github.event.client_payload.model) || '' }}
+            --model ${{ github.event.client_payload.model || 'claude-haiku-4-5-20251001' }}
+            --max-turns 50
             --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(npm:*),Bash(npx:*),Edit,Write,Read,Glob,Grep,Skill"
           prompt: |
             You are working on ticket ${{ github.event.client_payload.ticketKey }} from a personal issue tracker.
@@ -116,9 +137,11 @@ jobs:
             ${{ steps.screenshot.outputs.path && format('A screenshot is attached to the ticket at {0}. View it with the Read tool before starting; it shows what the ticket is about.', steps.screenshot.outputs.path) || '' }}
 
             Implement the ticket in this repository. Follow the repo's CLAUDE.md / conventions if
-            present, and run its lint/build/tests if available. Commit your work on the current
-            branch with Conventional Commit messages. Do not push or open a PR — a later workflow
-            step does that. If the ticket is unclear or needs no code change, make no commits.
+            present. Dependencies are already installed. Run its lint/build/tests once, after you
+            have finished all your edits, not after each edit; fix what they report, then re-run
+            only what failed. Commit your work on the current branch with Conventional Commit
+            messages. Do not push or open a PR — a later workflow step does that. If the ticket is
+            unclear or needs no code change, make no commits.
 
             If you find that everything the ticket asks for is ALREADY implemented in this
             repository, make no commits and instead write the file .tim-tickets/result.json
@@ -190,6 +213,78 @@ jobs:
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ steps.pr.outputs.number }}'
           claude_args: '--model claude-opus-5 --allowedTools "mcp__github_inline_comment__create_inline_comment"'
+
+      # When the run fails before a PR opens, keep whatever work exists and say why. The work is
+      # pushed to the agent branch (uncommitted edits are committed as WIP first) and also saved
+      # as a patch + Claude's execution log in the run's artifacts.
+      - name: Save work from failed run
+        id: salvage
+        if: failure() && steps.pr.outputs.outcome != 'pr_opened'
+        run: |
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -q -m "wip(${TICKET_KEY}): unfinished agent work" || true
+          fi
+          git diff "origin/${BASE_BRANCH}...HEAD" > "$AGENT_DIR/failed-run.patch" || true
+          if [ -s "$AGENT_DIR/failed-run.patch" ]; then
+            git push -u origin "${{ steps.branch.outputs.name }}" && echo "pushed=true" >> "$GITHUB_OUTPUT" || true
+          fi
+          exec_file="${{ steps.claude.outputs.execution_file }}"
+          if [ -n "$exec_file" ] && [ -f "$exec_file" ]; then
+            cp "$exec_file" "$AGENT_DIR/claude-execution.json"
+          fi
+
+      - name: Upload failed-run artifacts
+        if: failure() && steps.pr.outputs.outcome != 'pr_opened'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.TICKET_KEY }}-failed-run
+          path: |
+            ${{ env.AGENT_DIR }}/failed-run.patch
+            ${{ env.AGENT_DIR }}/claude-execution.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+
+      - name: File issue for failed run
+        if: failure() && steps.pr.outputs.outcome != 'pr_opened'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          PUSHED: ${{ steps.salvage.outputs.pushed }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
+        run: |
+          # Why it failed: Claude's own result record if it got that far (e.g. error_max_turns),
+          # otherwise the outcome of the Claude step.
+          reason="Claude step ${CLAUDE_OUTCOME:-did not run}."
+          if [ -f "$AGENT_DIR/claude-execution.json" ]; then
+            detail=$(jq -r '[.[] | select(.type == "result")] | last | select(. != null)
+              | "Result: \(.subtype // "unknown") after \(.num_turns // "?") turns. \((.result // "") | tostring | .[0:1500])"' \
+              "$AGENT_DIR/claude-execution.json" 2>/dev/null || true)
+            [ -n "$detail" ] && reason="$detail"
+          fi
+
+          {
+            echo "The agent run for **${TICKET_KEY}** (${TICKET_TITLE}) failed before opening a PR."
+            echo
+            echo "**Why:** ${reason}"
+            echo
+            echo "**Run:** ${RUN_URL} (the \`${TICKET_KEY}-failed-run\` artifact holds the patch and Claude's execution log)"
+            if [ "$PUSHED" = "true" ]; then
+              echo
+              echo "**Work so far:** [\`${BRANCH}\`](${{ github.server_url }}/${{ github.repository }}/tree/${BRANCH}) (unfinished; compare it against \`${BASE_BRANCH}\`)"
+            else
+              echo
+              echo "**Work so far:** none, the agent made no changes."
+            fi
+          } > "$AGENT_DIR/failure-body.md"
+
+          title="Agent run failed: ${TICKET_KEY}"
+          existing=$(gh issue list --state open --search "\"${title}\" in:title" --json number -q '.[0].number' || true)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$AGENT_DIR/failure-body.md"
+          else
+            gh issue create --title "$title" --body-file "$AGENT_DIR/failure-body.md"
+          fi
 
       - name: Report back to tim-tickets
         if: always()

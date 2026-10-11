@@ -8,11 +8,14 @@ import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computePrioritySort, computeReorder } from '@/lib/ordering';
 import { useShowArchived } from '@/lib/ShowArchivedContext';
+import { ticketsApi } from '@/lib/ticketsApi';
+import { useTicketStore } from '@/lib/useTicketStore';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
 import { ReleaseBotsModal } from './ReleaseBotsModal';
+import { TicketErrorBanner } from './TicketErrorBanner';
 import { TicketModal } from './TicketModal';
 import { ALL_JOGS_ID, STATUSES, Ticket, TicketStatus } from '@/lib/types';
 
@@ -25,8 +28,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const { epics } = useEpics();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tickets, setTickets] = useState(initialTickets);
-  const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
+  const [{ tickets, error }, store] = useTicketStore(initialTickets);
   const [selectedJogId, setSelectedJogId] = useState(jogs[0]?.id ?? '');
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [releasingBots, setReleasingBots] = useState(false);
@@ -35,27 +37,22 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
   const [epicFilter, setEpicFilter] = useState('all');
   const hasRestoredSelection = useRef(false);
 
-  if (initialTickets !== prevInitialTickets) {
-    setPrevInitialTickets(initialTickets);
-    setTickets(initialTickets);
-  }
-
   // The server only sends unarchived tickets (see the board page). When "Show archived" is on,
-  // pull the full list — and again after any server refresh, which resets `tickets` to the
-  // unarchived set.
+  // pull the full list — and again after any server refresh, which starts a fresh store from
+  // the unarchived set.
   useEffect(() => {
     if (!showArchived) return;
     let cancelled = false;
-    fetch('/api/tickets')
-      .then((response) => (response.ok ? response.json() : Promise.reject(response)))
-      .then((all: Ticket[]) => {
-        if (!cancelled) setTickets(all);
+    ticketsApi
+      .list()
+      .then((all) => {
+        if (!cancelled) store.replaceAll(all);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [showArchived, initialTickets]);
+  }, [showArchived, store]);
 
   // Resolve the initial jog selection once the jogs list is available. A `jogId` (and/or
   // `epicId`) query param — e.g. from clicking a jog/epic title on the Jogs/Epics pages —
@@ -167,43 +164,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
     const orderedList = arrayMove(columnTickets, oldIndex, newIndex);
 
     const { orderUpdates, persist } = computeReorder(orderedList, activeId);
-
-    setTickets((prev) =>
-      prev.map((t) => {
-        const newOrder = orderUpdates.get(t.id);
-        if (newOrder === undefined) return t;
-        if (t.id !== activeId) return { ...t, order: newOrder };
-        // Mirrors the server: moving to done discards the ticket's screenshot.
-        return { ...t, status: targetStatus, order: newOrder, ...(targetStatus === 'done' ? { screenshot: null } : {}) };
-      }),
-    );
-
-    if (persist.kind === 'bulk') {
-      // Reorder and status live on independent fields with no ordering dependency,
-      // so they're persisted concurrently rather than one after the other.
-      await Promise.all([
-        fetch('/api/tickets/reorder', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order: persist.orderedIds }),
-        }),
-        ...(statusChanged
-          ? [
-              fetch(`/api/tickets/${activeId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: targetStatus }),
-              }),
-            ]
-          : []),
-      ]);
-    } else {
-      await fetch(`/api/tickets/${activeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(statusChanged ? { order: persist.order, status: targetStatus } : { order: persist.order }),
-      });
-    }
+    await store.move(orderUpdates, persist, statusChanged ? { id: activeId, status: targetStatus } : undefined);
   }
 
   // Sorts each column's currently visible tickets by priority, per column so tickets only swap
@@ -214,27 +175,13 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       computePrioritySort(ticketsByStatus[status.value]).forEach((order, id) => updates.set(id, order));
     }
     if (updates.size === 0) return;
-
-    setTickets((prev) => prev.map((t) => (updates.has(t.id) ? { ...t, order: updates.get(t.id)! } : t)));
-    await fetch('/api/tickets/reorder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orders: [...updates].map(([id, order]) => ({ id, order })) }),
-    });
-  }
-
-  function handleSaved(ticket: Ticket) {
-    setTickets((prev) =>
-      prev.some((t) => t.id === ticket.id) ? prev.map((t) => (t.id === ticket.id ? ticket : t)) : [...prev, ticket],
-    );
-  }
-
-  function handleDeleted(ticketId: string) {
-    setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+    await store.setOrders(updates);
   }
 
   return (
     <div className="flex h-full flex-col">
+      {error && <TicketErrorBanner message={error} onDismiss={store.clearError} />}
+
       {/* Mobile: each control group stacked on its own line. */}
       <div className="mb-4 flex shrink-0 flex-col gap-3 lg:hidden">
         <div className="flex items-center gap-3">
@@ -385,8 +332,8 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
         <TicketModal
           ticket={editingTicket}
           onClose={() => setEditingTicket(null)}
-          onSaved={handleSaved}
-          onDeleted={handleDeleted}
+          onSaved={store.saved}
+          onDeleted={store.deleted}
         />
       )}
     </div>

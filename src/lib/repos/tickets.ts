@@ -63,6 +63,11 @@ export interface UpdateTicketInput {
   isArchived?: boolean;
 }
 
+export interface UpdateTicketResult {
+  ticket: Ticket;
+  epicStarted: boolean;
+}
+
 /** A successful "Release the bots" dispatch, recorded against the ticket it was for. */
 export interface AgentDispatch {
   repo: GithubRepoRef;
@@ -259,8 +264,12 @@ export function createTicketsRepo(db: FirestoreLike) {
     );
   }
 
-  async function updateTicket(id: string, input: UpdateTicketInput): Promise<void> {
+  /** Applies the update and returns the ticket as stored, so callers show the server's rules
+   * (e.g. done/archived clearing the screenshot) instead of re-deriving them. `epicStarted` is
+   * true when this update stamped the ticket's epic as started. */
+  async function updateTicket(id: string, input: UpdateTicketInput): Promise<UpdateTicketResult> {
     const now = new Date().toISOString();
+    let epicStarted = false;
 
     // First time any ticket in an epic moves off `todo`, stamp the epic as started. Only
     // relevant on the actual `todo` -> other transition, so the ticket is read once up front
@@ -273,7 +282,10 @@ export function createTicketsRepo(db: FirestoreLike) {
       if (ticketData?.status === 'todo') {
         const epicId = input.epicId !== undefined ? input.epicId : (ticketData.epicId as string | null | undefined);
         const epicRef = await epicToStart(epicId, (ref) => ref.get());
-        if (epicRef) await epicRef.update({ startedAt: now });
+        if (epicRef) {
+          await epicRef.update({ startedAt: now });
+          epicStarted = true;
+        }
       }
     }
 
@@ -285,12 +297,13 @@ export function createTicketsRepo(db: FirestoreLike) {
       batch.update(ticketsCollection().doc(id), { ...input, screenshot: null, updatedAt: now });
       batch.delete(screenshotsCollection().doc(id));
       await batch.commit();
-      return;
+    } else {
+      await ticketsCollection()
+        .doc(id)
+        .update({ ...input, updatedAt: now });
     }
 
-    await ticketsCollection()
-      .doc(id)
-      .update({ ...input, updatedAt: now });
+    return { ticket: toTicket(await ticketsCollection().doc(id).get()), epicStarted };
   }
 
   /** Records a dispatch that GitHub accepted: stamps `agentDispatchedAt`, moves a `todo` ticket

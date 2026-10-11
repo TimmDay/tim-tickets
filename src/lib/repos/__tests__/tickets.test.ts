@@ -89,6 +89,27 @@ describe('ticketsRepo.updateTicket', () => {
   });
 });
 
+describe('ticketsRepo.updateTicket result', () => {
+  it('returns the saved ticket, with the screenshot cleared when archiving', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await repo.setScreenshot('t2', Buffer.from([0x89, 0x50, 0x4e, 0x47]), 'image/png');
+
+    const { ticket } = await repo.updateTicket('t2', { isArchived: true });
+
+    expect(ticket).toMatchObject({ id: 't2', key: 'T-2', isArchived: true, screenshot: null });
+  });
+
+  it('says whether the update started its epic', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+
+    expect((await repo.updateTicket('t1', { status: 'in_progress' })).epicStarted).toBe(true);
+    expect((await repo.updateTicket('t4', { status: 'blocked' })).epicStarted).toBe(false);
+    expect((await repo.updateTicket('t2', { title: 'Renamed' })).epicStarted).toBe(false);
+  });
+});
+
 describe('ticketsRepo.recordDispatch', () => {
   const repo = { owner: 'o', name: 'r' };
 

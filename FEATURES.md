@@ -39,12 +39,12 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - At `lg` and up, the table fills the full remaining viewport height and scrolls internally; below `lg`, it scrolls with the rest of the page instead (see the full-height layout note below).
 
 ### `/epics` — Epics list
-- Table of every epic: name, created date, started date, completed date, ticket count.
+- Table of every epic: name, created date, started date, completed date, ticket count, done count (member tickets in `done`, archived or not).
 - Clicking an epic's name navigates to the Current Jog board with the jog dropdown set to "All tickets" and the epic filter set to this epic (see below).
 - Edit icon per row opens the same create/edit modal used for "+ New Epic"; editing changes the epic's name, description, color, and GitHub repo.
 - An epic can have an optional **GitHub repo** URL (validated as `github.com/owner/repo`, stored normalized). When set, a link icon next to the epic's name opens the repo. This is the repo that agents triggered for the epic's tickets act on (see "Release the bots").
 - Delete icon per row opens a confirmation modal; deleting an epic clears `epicId` on its member tickets (there's no "default epic" to reassign to — a ticket's epic is always optional).
-- Archive action opens a confirmation modal; archiving an epic archives it **and every ticket assigned to it, regardless of status** (unlike jog completion, which only auto-archives `done` tickets and reassigns the rest — epics have no "in-flight" concept to preserve). Archived epics are hidden by default; a "Show archived" checkbox reveals them.
+- Complete action opens a confirmation modal, mirroring jog completion: completing an epic archives it, stamps `completedAt`, and archives its tickets in `done`. Tickets in other columns stay active and keep the (now archived) epic, since there's no default epic to move them to. Archived epics are hidden by default; a "Show archived" checkbox reveals them.
 - Drag rows via a grip handle to reorder (persisted, always active — no competing sort/filter here, same as the Jogs list).
 - At `lg` and up, the table fills the full remaining viewport height and scrolls internally; below `lg`, it scrolls with the rest of the page instead (see the full-height layout note below).
 
@@ -58,7 +58,7 @@ Working spec for tim-tickets, a personal issue tracker. This is where we decide 
 - A ticket can have **one** optional screenshot, added at the bottom of the create/edit modal: an "Add screenshot" button on mobile (opens the photo library), and on desktop a drop zone that's also clickable to choose a file. Pasting an image (⌘V / Ctrl+V) anywhere in the modal also works. A thumbnail (click to open full size) offers Replace / Remove.
 - The browser compresses before upload: long edge capped at 2000px, re-encoded as WebP (JPEG where WebP encoding isn't supported), stepping quality/size down until it's under 900 KB. Nothing uploads until Save/Create. If the ticket saves but the screenshot upload fails, the modal stays open to retry, and a retry after Create updates the new ticket rather than duplicating it.
 - Stored in Firestore: the bytes in `ticketScreenshots/{ticketId}` (kept out of the ticket doc so loading tickets never pulls images), with `ticket.screenshot` holding just `{contentType, size, updatedAt}`. Uploads are validated by file signature (PNG/JPEG/WebP only) and size.
-- Short-lived by design, so images don't accumulate in Firestore storage: a screenshot is **deleted when its ticket moves to `done`** (drag, modal, or a merged agent PR), **is archived** (directly, or by archiving its epic), **or is deleted**. Done and archived tickets refuse new ones, and the modal hides the field for them. Replacing a screenshot overwrites the single image doc. Tickets that stay open keep theirs (at most one each, typically 150–250 KB).
+- Short-lived by design, so images don't accumulate in Firestore storage: a screenshot is **deleted when its ticket moves to `done`** (drag, modal, or a merged agent PR), **is archived**, **or is deleted**. Done and archived tickets refuse new ones, and the modal hides the field for them. Replacing a screenshot overwrites the single image doc. Tickets that stay open keep theirs (at most one each, typically 150–250 KB).
 - Agent runs: when the ticket has a screenshot, the dispatch payload includes `screenshotUrl` (`/api/agent/tickets/:key/screenshot`, bearer `AGENT_API_TOKEN`). The workflow downloads it into `.tim-tickets/` (the agent's git-excluded scratch folder, so never committed) and the prompt tells Claude to view it with the Read tool. A failed download logs a warning and the run continues without it.
 
 ### Comments
@@ -118,7 +118,7 @@ interface Ticket {
 
 ## Epic Fields
 
-Name plus a lifecycle flag and a manual `order` (drag-reordered on the Epics page, same fractional-index mechanism as jogs/tickets — see "Ordering mechanism" below). `startedAt` is stamped automatically (not user-set) the first time any member ticket's status moves off `todo` (set in `updateTicket`, once — never overwritten after). `completedAt` is stamped when the epic is archived.
+Name plus a lifecycle flag and a manual `order` (drag-reordered on the Epics page, same fractional-index mechanism as jogs/tickets — see "Ordering mechanism" below). `startedAt` is stamped automatically (not user-set) the first time any member ticket's status moves off `todo` (set in `updateTicket`, once — never overwritten after). `completedAt` is stamped when the epic is completed.
 
 ```ts
 type EpicColorTheme = 'indigo' | 'blue' | 'emerald' | 'rose' | 'amber';
@@ -131,7 +131,7 @@ interface Epic {
   repoUrl: string | null;     // optional GitHub repo, normalized to https://github.com/owner/name
   isArchived: boolean;
   startedAt: string | null;   // ISO; auto-set once, first ticket to leave `todo`
-  completedAt: string | null; // ISO; set when the epic is archived
+  completedAt: string | null; // ISO; set when the epic is completed
   createdAt: string;          // ISO
   order: number;              // manual ordering on the Epics page
 }

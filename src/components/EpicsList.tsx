@@ -9,7 +9,6 @@ import { useEpics } from '@/lib/EpicsContext';
 import { computeReorder } from '@/lib/ordering';
 import { useShowArchived } from '@/lib/ShowArchivedContext';
 import { useTapTooltip } from '@/lib/useTapTooltip';
-import { ArchiveIcon } from './ArchiveIcon';
 import { ConfirmModal } from './ConfirmModal';
 import { EpicModal } from './EpicModal';
 import { FilterInput } from './FilterInput';
@@ -25,13 +24,14 @@ function formatDate(iso: string | null): string {
 
 interface EpicsListProps {
   ticketCounts: Record<string, number>;
+  doneCounts: Record<string, number>;
 }
 
-export function EpicsList({ ticketCounts }: EpicsListProps) {
-  const { epics, deleteEpic, archiveEpic, reorderEpics, updateEpicOrder } = useEpics();
+export function EpicsList({ ticketCounts, doneCounts }: EpicsListProps) {
+  const { epics, deleteEpic, completeEpic, reorderEpics, updateEpicOrder } = useEpics();
   const [editingEpic, setEditingEpic] = useState<Epic | null>(null);
   const [deletingEpic, setDeletingEpic] = useState<Epic | null>(null);
-  const [archivingEpic, setArchivingEpic] = useState<Epic | null>(null);
+  const [completingEpic, setCompletingEpic] = useState<Epic | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showNewEpic, setShowNewEpic] = useState(false);
   const { showArchived, setShowArchived } = useShowArchived();
@@ -75,14 +75,14 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
     }
   }
 
-  async function confirmArchive() {
-    if (!archivingEpic) return;
-    const epic = archivingEpic;
-    setArchivingEpic(null);
+  async function confirmComplete() {
+    if (!completingEpic) return;
+    const epic = completingEpic;
+    setCompletingEpic(null);
     try {
-      await archiveEpic(epic.id);
+      await completeEpic(epic.id);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to archive epic');
+      setActionError(err instanceof Error ? err.message : 'Failed to complete epic');
     }
   }
 
@@ -126,6 +126,7 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
                   <th className="px-3 py-2 font-medium">Started</th>
                   <th className="px-3 py-2 font-medium">Completed</th>
                   <th className="px-3 py-2 font-medium">Tickets</th>
+                  <th className="px-3 py-2 font-medium">Done</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
@@ -136,14 +137,15 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
                       key={epic.id}
                       epic={epic}
                       ticketCount={ticketCounts[epic.id] ?? 0}
+                      doneCount={doneCounts[epic.id] ?? 0}
                       onEdit={() => setEditingEpic(epic)}
                       onDelete={() => setDeletingEpic(epic)}
-                      onArchive={() => setArchivingEpic(epic)}
+                      onComplete={() => setCompletingEpic(epic)}
                     />
                   ))}
                   {displayedEpics.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={7} className="px-3 py-6 text-center text-gray-400 dark:text-gray-500">
                         No epics yet.
                       </td>
                     </tr>
@@ -161,9 +163,10 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
               key={epic.id}
               epic={epic}
               ticketCount={ticketCounts[epic.id] ?? 0}
+              doneCount={doneCounts[epic.id] ?? 0}
               onEdit={() => setEditingEpic(epic)}
               onDelete={() => setDeletingEpic(epic)}
-              onArchive={() => setArchivingEpic(epic)}
+              onComplete={() => setCompletingEpic(epic)}
             />
           ))}
           {displayedEpics.length === 0 && (
@@ -185,13 +188,13 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
         />
       )}
 
-      {archivingEpic && (
+      {completingEpic && (
         <ConfirmModal
-          title="Archive epic"
-          message={`Archiving "${archivingEpic.name}" will archive it and ALL tickets assigned to it, regardless of status. You can view this archived epic in future by checking the show archived box on the epics page.`}
-          confirmLabel="Archive"
-          onConfirm={confirmArchive}
-          onCancel={() => setArchivingEpic(null)}
+          title="Complete epic"
+          message={`Completing "${completingEpic.name}" will archive it, and automatically archive all tasks in it that are in the DONE column. All tasks in other columns stay active and keep this epic. You can view this archived epic in future by checking the show archived box on the epics page.`}
+          confirmLabel="Complete"
+          onConfirm={confirmComplete}
+          onCancel={() => setCompletingEpic(null)}
         />
       )}
     </div>
@@ -201,12 +204,13 @@ export function EpicsList({ ticketCounts }: EpicsListProps) {
 interface EpicRowProps {
   epic: Epic;
   ticketCount: number;
+  doneCount: number;
   onEdit: () => void;
   onDelete: () => void;
-  onArchive: () => void;
+  onComplete: () => void;
 }
 
-function SortableEpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicRowProps) {
+function SortableEpicRow({ epic, ticketCount, doneCount, onEdit, onDelete, onComplete }: EpicRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: epic.id });
 
   return (
@@ -242,8 +246,22 @@ function SortableEpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: Epi
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.startedAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{formatDate(epic.completedAt)}</td>
       <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{ticketCount}</td>
+      <td className="px-3 py-2 text-gray-500 dark:text-gray-500">{doneCount}</td>
       <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onComplete}
+            disabled={epic.isArchived}
+            title={epic.isArchived ? 'Already archived' : undefined}
+            className={`text-sm ${
+              epic.isArchived
+                ? 'cursor-not-allowed text-gray-300 dark:text-gray-700'
+                : 'text-gray-600 hover:underline dark:text-gray-400'
+            }`}
+          >
+            Complete
+          </button>
           <button
             type="button"
             onClick={onEdit}
@@ -252,20 +270,6 @@ function SortableEpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: Epi
             title="Edit epic"
           >
             <PencilIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onArchive}
-            disabled={epic.isArchived}
-            aria-label="Archive epic"
-            title={epic.isArchived ? 'Already archived' : 'Archive epic'}
-            className={
-              epic.isArchived
-                ? 'cursor-not-allowed text-gray-300 dark:text-gray-700'
-                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
-            }
-          >
-            <ArchiveIcon className="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -284,12 +288,13 @@ function SortableEpicRow({ epic, ticketCount, onEdit, onDelete, onArchive }: Epi
 interface EpicCardProps {
   epic: Epic;
   ticketCount: number;
+  doneCount: number;
   onEdit: () => void;
   onDelete: () => void;
-  onArchive: () => void;
+  onComplete: () => void;
 }
 
-function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardProps) {
+function EpicCard({ epic, ticketCount, doneCount, onEdit, onDelete, onComplete }: EpicCardProps) {
   const { open: descriptionOpen, setOpen: setDescriptionOpen, containerRef: descriptionRef } = useTapTooltip<HTMLSpanElement>();
 
   return (
@@ -352,13 +357,16 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
           {ticketCount} ticket{ticketCount === 1 ? '' : 's'}
         </span>
+        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+          {doneCount} done
+        </span>
         {epic.startedAt && <span>{formatDate(epic.startedAt)}</span>}
         {epic.completedAt && <span>Completed {formatDate(epic.completedAt)}</span>}
       </div>
       <div className="mt-2">
         <button
           type="button"
-          onClick={onArchive}
+          onClick={onComplete}
           disabled={epic.isArchived}
           title={epic.isArchived ? 'Already archived' : undefined}
           className={`text-sm ${
@@ -367,7 +375,7 @@ function EpicCard({ epic, ticketCount, onEdit, onDelete, onArchive }: EpicCardPr
               : 'text-gray-600 hover:underline dark:text-gray-400'
           }`}
         >
-          Archive
+          Complete
         </button>
       </div>
     </div>

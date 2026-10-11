@@ -17,7 +17,7 @@ interface EpicsContextValue {
   updateEpicOrder: (id: string, order: number) => Promise<void>;
   reorderEpics: (orderedIds: string[]) => Promise<void>;
   deleteEpic: (id: string) => Promise<void>;
-  archiveEpic: (id: string) => Promise<void>;
+  completeEpic: (id: string) => Promise<void>;
 }
 
 const EpicsContext = createContext<EpicsContextValue | null>(null);
@@ -108,8 +108,12 @@ export function EpicsProvider({ children, initialEpics }: { children: ReactNode;
     setEpics((prev) => prev.filter((epic) => epic.id !== id));
   }, []);
 
-  const archiveEpic = useCallback(async (id: string) => {
-    await fetch(`/api/epics/${id}/archive`, { method: 'POST' });
+  const completeEpic = useCallback(async (id: string) => {
+    const response = await fetch(`/api/epics/${id}/complete`, { method: 'POST' });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? 'Failed to complete epic');
+    }
     setEpics((prev) =>
       prev.map((epic) =>
         epic.id === id ? { ...epic, isArchived: true, completedAt: new Date().toISOString() } : epic,
@@ -119,7 +123,7 @@ export function EpicsProvider({ children, initialEpics }: { children: ReactNode;
 
   return (
     <EpicsContext.Provider
-      value={{ epics, refresh, createEpic, updateEpic, updateEpicOrder, reorderEpics, deleteEpic, archiveEpic }}
+      value={{ epics, refresh, createEpic, updateEpic, updateEpicOrder, reorderEpics, deleteEpic, completeEpic }}
     >
       {children}
     </EpicsContext.Provider>

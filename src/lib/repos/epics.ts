@@ -27,11 +27,9 @@ export interface UpdateEpicInput {
 
 export function createEpicsRepo(db: FirestoreLike) {
   const epicsCollection = () => db.collection('epics');
-  // deleteEpic/archiveEpic cascade into member tickets — see tickets.ts for why this reaches
+  // deleteEpic/completeEpic cascade into member tickets — see tickets.ts for why this reaches
   // into the tickets collection directly rather than depending on the tickets repo.
   const ticketsCollection = () => db.collection('tickets');
-  // archiveEpic discards its tickets' screenshots, same rule as archiving a ticket directly.
-  const screenshotsCollection = () => db.collection('ticketScreenshots');
 
   async function getEpics(): Promise<Epic[]> {
     const snapshot = await epicsCollection().orderBy('createdAt', 'asc').get();
@@ -83,8 +81,9 @@ export function createEpicsRepo(db: FirestoreLike) {
     await commitInChunks(db, mutations);
   }
 
-  /** Archives an epic and every ticket assigned to it, regardless of status. */
-  async function archiveEpic(id: string): Promise<void> {
+  /** Completes an epic: archives it and stamps `completedAt`, and archives its tickets in the
+   * "done" column. Unfinished tickets stay active and keep the (now archived) epic. */
+  async function completeEpic(id: string): Promise<void> {
     const memberTickets = await ticketsCollection().where('epicId', '==', id).get();
     const now = new Date().toISOString();
 
@@ -93,18 +92,15 @@ export function createEpicsRepo(db: FirestoreLike) {
     ];
 
     memberTickets.docs.forEach((doc) => {
-      mutations.push((batch) =>
-        batch.update(ticketsCollection().doc(doc.id), { isArchived: true, screenshot: null, updatedAt: now }),
-      );
-      if (doc.data()?.screenshot) {
-        mutations.push((batch) => batch.delete(screenshotsCollection().doc(doc.id)));
+      if (doc.data()?.status === 'done') {
+        mutations.push((batch) => batch.update(ticketsCollection().doc(doc.id), { isArchived: true, updatedAt: now }));
       }
     });
 
     await commitInChunks(db, mutations);
   }
 
-  return { getEpics, createEpic, updateEpic, reorderEpics, deleteEpic, archiveEpic };
+  return { getEpics, createEpic, updateEpic, reorderEpics, deleteEpic, completeEpic };
 }
 
 export type EpicsRepo = ReturnType<typeof createEpicsRepo>;

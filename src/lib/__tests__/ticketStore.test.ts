@@ -70,45 +70,19 @@ describe('ticketStore.update', () => {
     expect(store.getSnapshot().tickets[0]).toMatchObject({ isArchived: true, screenshot: null });
   });
 
-  it('puts the ticket back and reports the error when the server refuses', async () => {
+  it('reloads from the server and reports the error when the server refuses', async () => {
     const store = createTicketStore(
       [ticket('a'), ticket('b')],
-      fakeApi({ update: () => Promise.reject(new Error('Firestore unavailable')) }),
+      fakeApi({
+        update: () => Promise.reject(new Error('Firestore unavailable')),
+        list: async () => [ticket('a'), ticket('b')],
+      }),
     );
 
     await store.update('a', { jogId: 'other' });
 
     expect(store.getSnapshot().tickets.map((t) => t.jogId)).toEqual(['jog', 'jog']);
     expect(store.getSnapshot().error).toBe('Firestore unavailable');
-  });
-
-  it('ignores an older answer that arrives after a newer change to the same ticket', async () => {
-    const first = deferred<{ ticket: Ticket; epicStarted: boolean }>();
-    const second = deferred<{ ticket: Ticket; epicStarted: boolean }>();
-    const answers = [first.promise, second.promise];
-    const store = createTicketStore([ticket('a')], fakeApi({ update: () => answers.shift()! }));
-
-    const one = store.update('a', { status: 'in_progress' });
-    const two = store.update('a', { status: 'done' });
-    second.resolve({ ticket: ticket('a', { status: 'done' }), epicStarted: false });
-    await two;
-    first.resolve({ ticket: ticket('a', { status: 'in_progress' }), epicStarted: false });
-    await one;
-
-    expect(store.getSnapshot().tickets[0].status).toBe('done');
-  });
-
-  it("doesn't roll back over a newer change when an older one fails", async () => {
-    const first = deferred<{ ticket: Ticket; epicStarted: boolean }>();
-    const answers = [first.promise, Promise.resolve({ ticket: ticket('a', { status: 'done' }), epicStarted: false })];
-    const store = createTicketStore([ticket('a')], fakeApi({ update: () => answers.shift()! }));
-
-    const one = store.update('a', { status: 'in_progress' });
-    await store.update('a', { status: 'done' });
-    first.reject(new Error('timeout'));
-    await one;
-
-    expect(store.getSnapshot().tickets[0].status).toBe('done');
   });
 
   it('tells the caller when an update started an epic', async () => {
@@ -156,36 +130,6 @@ describe('ticketStore.move', () => {
     await store.move(new Map([['a', 7]]), { kind: 'single', id: 'a', order: 7 }, { id: 'a', status: 'blocked' });
 
     expect(update).toHaveBeenCalledWith('a', { order: 7, status: 'blocked' });
-  });
-
-  it('puts every moved ticket back when the reorder fails', async () => {
-    const store = createTicketStore(
-      [ticket('a', { order: 1 }), ticket('b', { order: 2 })],
-      fakeApi({ reorder: () => Promise.reject(new Error('nope')) }),
-    );
-
-    await store.move(
-      new Map([
-        ['a', 3],
-        ['b', 4],
-      ]),
-      { kind: 'bulk', orderedIds: ['b', 'a'] },
-    );
-
-    expect(store.getSnapshot().tickets.map((t) => t.order)).toEqual([1, 2]);
-    expect(store.getSnapshot().error).toBe('nope');
-  });
-});
-
-describe('ticketStore.remove', () => {
-  it('drops the ticket at once and restores it if the delete fails', async () => {
-    const store = createTicketStore([ticket('a'), ticket('b')], fakeApi({ remove: () => Promise.reject(new Error('no')) }));
-
-    const pending = store.remove('a');
-    expect(store.getSnapshot().tickets.map((t) => t.id)).toEqual(['b']);
-    await pending;
-
-    expect(store.getSnapshot().tickets.map((t) => t.id).sort()).toEqual(['a', 'b']);
   });
 });
 

@@ -5,19 +5,16 @@ import { Ticket, TicketStatus } from './types';
 
 export interface TicketStoreState {
   tickets: Ticket[];
-  /** The last failed change, already rolled back. Cleared by `clearError` or the next change. */
+  /** The last failed change. Cleared by `clearError` or the next change. */
   error: string | null;
 }
-
-/** A local change to one ticket: fields to merge, or null to remove it. */
-type LocalChange = Partial<Ticket> | null;
 
 /**
  * Client-side owner of a page's ticket list. Each change shows at once, then settles to the
  * ticket the server returns, so server-side rules (e.g. done or archived clears the screenshot)
- * show without being re-implemented here. A failed change puts back the tickets it touched,
- * unless a newer change to the same ticket has happened since. Framework-free so it can be
- * tested in node; `useTicketStore` binds it to React.
+ * show without being re-implemented here. A failed change reloads the list from the server and
+ * reports the error. Framework-free so it can be tested in node; `useTicketStore` binds it to
+ * React.
  */
 export function createTicketStore(
   initialTickets: Ticket[],
@@ -26,55 +23,33 @@ export function createTicketStore(
 ) {
   let state: TicketStoreState = { tickets: initialTickets, error: null };
   const listeners = new Set<() => void>();
-  // id -> number of the latest change touching that ticket, so stale answers are ignored.
-  const latestChange = new Map<string, number>();
-  let changeCount = 0;
 
-  function setState(next: TicketStoreState) {
-    state = next;
+  function setState(next: Partial<TicketStoreState>) {
+    state = { ...state, ...next };
     listeners.forEach((listener) => listener());
   }
 
-  function applyLocal(changes: Map<string, LocalChange>, error: string | null = state.error) {
-    let tickets = state.tickets
+  /** Merges each ticket's changes into the list; a change for an unknown id adds it, null removes. */
+  function apply(changes: Map<string, Partial<Ticket> | null>) {
+    const tickets = state.tickets
       .filter((t) => changes.get(t.id) !== null)
-      .map((t) => {
-        const change = changes.get(t.id);
-        return change ? { ...t, ...change } : t;
-      });
-    // A change carrying a full ticket that isn't in the list yet (a create, or a rollback of a
-    // delete) is added.
+      .map((t) => ({ ...t, ...changes.get(t.id) }));
     for (const [id, change] of changes) {
-      if (change && 'id' in change && !tickets.some((t) => t.id === id)) tickets = [...tickets, change as Ticket];
+      if (change && !tickets.some((t) => t.id === id)) tickets.push(change as Ticket);
     }
-    setState({ tickets, error });
+    setState({ tickets });
   }
 
-  function stamp(ids: Iterable<string>): number {
-    const change = ++changeCount;
-    for (const id of ids) latestChange.set(id, change);
-    return change;
-  }
-
-  /** Shows `changes` now, runs `request`, then settles each ticket the server returned, or
-   * rolls back on failure. Only tickets whose latest change is this one are settled or
-   * rolled back. */
-  async function change(changes: Map<string, LocalChange>, request: () => Promise<Ticket[] | void>) {
-    const previous = new Map(state.tickets.filter((t) => changes.has(t.id)).map((t) => [t.id, t]));
-    const thisChange = stamp(changes.keys());
-    const isLatest = (id: string) => latestChange.get(id) === thisChange;
-    applyLocal(changes, null);
-
+  async function change(optimistic: Map<string, Partial<Ticket> | null>, request: () => Promise<Ticket[] | void>) {
+    apply(optimistic);
+    setState({ error: null });
     try {
       const saved = (await request()) ?? [];
-      const settled = new Map<string, LocalChange>(saved.filter((t) => isLatest(t.id)).map((t) => [t.id, t]));
-      if (settled.size > 0) applyLocal(settled);
+      apply(new Map(saved.map((t) => [t.id, t])));
     } catch (err) {
-      const rollback = new Map<string, LocalChange>();
-      for (const id of changes.keys()) {
-        if (isLatest(id)) rollback.set(id, previous.get(id) ?? null);
-      }
-      applyLocal(rollback, err instanceof Error ? err.message : 'Something went wrong');
+      setState({ error: err instanceof Error ? err.message : 'Something went wrong' });
+      // Back to whatever the server actually has.
+      await api.list().then((tickets) => setState({ tickets }), () => {});
     }
   }
 
@@ -90,41 +65,28 @@ export function createTicketStore(
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    clearError() {
-      if (state.error) setState({ ...state, error: null });
-    },
+    clearError: () => setState({ error: null }),
 
     /** Replaces the whole list, e.g. after loading archived tickets too. */
-    replaceAll(tickets: Ticket[]) {
-      setState({ tickets, error: state.error });
-    },
+    replaceAll: (tickets: Ticket[]) => setState({ tickets }),
     /** A ticket the ticket modal saved: already the server's copy. */
-    saved(ticket: Ticket) {
-      stamp([ticket.id]);
-      applyLocal(new Map([[ticket.id, ticket]]));
-    },
+    saved: (ticket: Ticket) => apply(new Map([[ticket.id, ticket]])),
     /** A ticket the ticket modal deleted. */
-    deleted(id: string) {
-      stamp([id]);
-      applyLocal(new Map([[id, null]]));
-    },
+    deleted: (id: string) => apply(new Map([[id, null]])),
 
-    update(id: string, patch: UpdateTicketInput) {
-      return change(new Map([[id, patch as Partial<Ticket>]]), async () => [await sendUpdate(id, patch)]);
-    },
+    update: (id: string, patch: UpdateTicketInput) =>
+      change(new Map([[id, patch as Partial<Ticket>]]), async () => [await sendUpdate(id, patch)]),
 
-    remove(id: string) {
-      return change(new Map([[id, null]]), () => api.remove(id));
-    },
+    remove: (id: string) => change(new Map([[id, null]]), () => api.remove(id)),
 
     /** A drag: new orders from `computeReorder`, plus the dragged ticket's new column if it
      * changed. Order and status are independent fields, so a bulk renumber and the status
      * change are sent concurrently. */
     move(orderUpdates: Map<string, number>, persist: ReorderPersist, statusChange?: { id: string; status: TicketStatus }) {
-      const changes = new Map<string, LocalChange>([...orderUpdates].map(([id, order]) => [id, { order }]));
-      if (statusChange) changes.set(statusChange.id, { ...changes.get(statusChange.id), status: statusChange.status });
+      const optimistic = new Map<string, Partial<Ticket>>([...orderUpdates].map(([id, order]) => [id, { order }]));
+      if (statusChange) optimistic.set(statusChange.id, { ...optimistic.get(statusChange.id), status: statusChange.status });
 
-      return change(changes, async () => {
+      return change(optimistic, async () => {
         if (persist.kind === 'single') {
           const status = statusChange?.id === persist.id ? { status: statusChange.status } : {};
           return [await sendUpdate(persist.id, { order: persist.order, ...status })];
@@ -141,10 +103,11 @@ export function createTicketStore(
     },
 
     /** Explicit order values, e.g. the board's sort-by-priority. */
-    setOrders(orders: Map<string, number>) {
-      const changes = new Map<string, LocalChange>([...orders].map(([id, order]) => [id, { order }]));
-      return change(changes, () => api.setOrders([...orders].map(([id, order]) => ({ id, order }))));
-    },
+    setOrders: (orders: Map<string, number>) =>
+      change(
+        new Map([...orders].map(([id, order]) => [id, { order }])),
+        () => api.setOrders([...orders].map(([id, order]) => ({ id, order }))),
+      ),
   };
 }
 

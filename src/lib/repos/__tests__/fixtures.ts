@@ -1,6 +1,6 @@
 // Shared seed data for repo tests: ~10 tickets spread across every status, two jogs (one
 // default, one not), and two epics (one already started, one not) — enough spread to exercise
-// the cascades in deleteJog/completeJog/archiveEpic/updateTicket without every test needing its
+// the cascades in deleteJog/completeJog/completeEpic/updateTicket without every test needing its
 // own bespoke dataset.
 
 export const JOG_DEFAULT_ID = 'jog-default';

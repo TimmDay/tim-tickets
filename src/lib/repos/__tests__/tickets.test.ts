@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTicketsRepo } from '../tickets';
 import { createFakeFirestore } from './fakeFirestore';
-import { EPIC_A_ID, EPIC_B_ID, seedFirestore } from './fixtures';
+import { EPIC_A_ID, EPIC_B_ID, JOG_SPRINT2_ID, seedFirestore } from './fixtures';
 
 describe('ticketsRepo.getTickets', () => {
   it('backfills a missing key exactly once, without touching tickets that already have one', async () => {
@@ -86,6 +86,91 @@ describe('ticketsRepo.updateTicket', () => {
     await repo.updateTicket('t5', { status: 'blocked' });
     const epicBAfter = await db.collection('epics').doc(EPIC_B_ID).get();
     expect(epicBAfter.data()?.startedAt).toBe(epicBBefore.data()?.startedAt);
+  });
+});
+
+describe('ticketsRepo.updateTicket result', () => {
+  it('returns the saved ticket, with the screenshot cleared when archiving', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+    await repo.setScreenshot('t2', Buffer.from([0x89, 0x50, 0x4e, 0x47]), 'image/png');
+
+    const { ticket } = await repo.updateTicket('t2', { isArchived: true });
+
+    expect(ticket).toMatchObject({ id: 't2', key: 'T-2', isArchived: true, screenshot: null });
+  });
+
+  it('says whether the update started its epic', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createTicketsRepo(db);
+
+    expect((await repo.updateTicket('t1', { status: 'in_progress' })).epicStarted).toBe(true);
+    expect((await repo.updateTicket('t4', { status: 'blocked' })).epicStarted).toBe(false);
+    expect((await repo.updateTicket('t2', { title: 'Renamed' })).epicStarted).toBe(false);
+  });
+});
+
+describe('ticketsRepo.recordDispatch', () => {
+  const repo = { owner: 'o', name: 'r' };
+
+  it('stamps the dispatch, moves todo to in_progress and comments where it went', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    await db.collection('tickets').doc('t1').update({ agentModel: 'claude-sonnet-5' });
+
+    await createTicketsRepo(db).recordDispatch('t1', { repo, requestOpusReview: false });
+
+    const t1 = (await db.collection('tickets').doc('t1').get()).data()!;
+    expect(t1.agentDispatchedAt).toBeTruthy();
+    expect(t1.status).toBe('in_progress');
+    expect(t1.comments).toEqual([expect.objectContaining({ body: '🤖 Agent dispatched to o/r (Sonnet 5)' })]);
+  });
+
+  it('leaves a ticket already in progress where it is, and keeps its earlier comments', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const earlier = { id: 'c1', body: 'earlier', createdAt: '2026-01-01T00:00:00.000Z' };
+    await db.collection('tickets').doc('t4').update({ comments: [earlier] });
+
+    await createTicketsRepo(db).recordDispatch('t4', { repo, requestOpusReview: true });
+
+    const t4 = (await db.collection('tickets').doc('t4').get()).data()!;
+    expect(t4.status).toBe('in_progress');
+    expect(t4.comments).toEqual([
+      earlier,
+      expect.objectContaining({ body: '🤖 Agent dispatched to o/r (default model), Opus review requested' }),
+    ]);
+  });
+
+  it('moves the ticket into the target jog only when asked to', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const tickets = createTicketsRepo(db);
+
+    await tickets.recordDispatch('t3', { repo, requestOpusReview: false, moveTo: { jogId: JOG_SPRINT2_ID, order: 42 } });
+    await tickets.recordDispatch('t2', { repo, requestOpusReview: false });
+
+    const t3 = (await db.collection('tickets').doc('t3').get()).data()!;
+    expect(t3.jogId).toBe(JOG_SPRINT2_ID);
+    expect(t3.order).toBe(42);
+    const t2 = (await db.collection('tickets').doc('t2').get()).data()!;
+    expect(t2.jogId).toBe(JOG_SPRINT2_ID);
+    expect(t2.order).toBe(2000);
+  });
+
+  it("stamps the epic's startedAt when the dispatch moves its first ticket off todo", async () => {
+    const db = createFakeFirestore(seedFirestore());
+
+    await createTicketsRepo(db).recordDispatch('t1', { repo, requestOpusReview: false });
+
+    expect((await db.collection('epics').doc(EPIC_A_ID).get()).data()?.startedAt).toBeTruthy();
+  });
+
+  it("leaves the epic alone when the ticket was already off todo", async () => {
+    const db = createFakeFirestore(seedFirestore());
+    await db.collection('tickets').doc('t1').update({ status: 'blocked' });
+
+    await createTicketsRepo(db).recordDispatch('t1', { repo, requestOpusReview: false });
+
+    expect((await db.collection('epics').doc(EPIC_A_ID).get()).data()?.startedAt).toBeNull();
+    expect((await db.collection('tickets').doc('t1').get()).data()?.status).toBe('blocked');
   });
 });
 

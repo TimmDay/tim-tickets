@@ -20,6 +20,7 @@ import { useNewTicketDraft } from '@/lib/formDrafts';
 import { formatElapsed, hasAgentTag, isAgentReportOverdue } from '@/lib/agentRuns';
 import { useNow } from '@/lib/useNow';
 import { compressScreenshot } from '@/lib/compressScreenshot';
+import { ticketsApi } from '@/lib/ticketsApi';
 import {
   AgentModel,
   BASE_TAGS,
@@ -48,7 +49,7 @@ interface TicketModalProps {
 
 export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted }: TicketModalProps) {
   const { jogs } = useJogs();
-  const { epics } = useEpics();
+  const { epics, refresh: refreshEpics } = useEpics();
   const isEditing = Boolean(ticket);
   const { getDraft, setDraft, clearDraft } = useNewTicketDraft();
   // Draft persistence only applies to new-ticket creation, not in-progress edits to an
@@ -168,13 +169,12 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     setSaving(true);
     setError(null);
 
-    const payload = {
+    const fields = {
       title: title.trim(),
       body,
       jogId,
       epicId,
       priority,
-      status,
       dueDate: dueDate || null,
       tags,
       agentModel,
@@ -183,18 +183,12 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     const existing = ticket ?? createdTicketRef.current;
     let saved: Ticket;
     try {
-      const response = await fetch(existing ? `/api/tickets/${existing.id}` : '/api/tickets', {
-        method: existing ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error('Failed to save ticket');
-
-      saved = existing
-        ? { ...existing, ...payload, comments, updatedAt: new Date().toISOString() }
-        : await response.json();
-      if (!existing) {
+      if (existing) {
+        const result = await ticketsApi.update(existing.id, { ...fields, status });
+        if (result.epicStarted) refreshEpics();
+        saved = result.ticket;
+      } else {
+        saved = await ticketsApi.create(fields);
         createdTicketRef.current = saved;
         clearDraft();
       }
@@ -204,23 +198,13 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       return;
     }
 
-    // The ticket is saved; now the screenshot. Done/archived tickets never keep one (the server
-    // clears it and refuses new ones), so a pending change is just dropped.
+    // The ticket is saved; now the screenshot. Done/archived tickets never keep one (the saved
+    // ticket already shows the server cleared it), so a pending change is just dropped.
     try {
-      if (!canHaveScreenshot) {
-        saved = { ...saved, screenshot: null };
-      } else if (screenshotChange.kind === 'set') {
-        const response = await fetch(`/api/tickets/${saved.id}/screenshot`, {
-          method: 'PUT',
-          headers: { 'Content-Type': screenshotChange.blob.type },
-          body: screenshotChange.blob,
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Upload failed');
-        saved = { ...saved, screenshot: data };
-      } else if (screenshotChange.kind === 'remove' && saved.screenshot) {
-        const response = await fetch(`/api/tickets/${saved.id}/screenshot`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Removing the screenshot failed');
+      if (canHaveScreenshot && screenshotChange.kind === 'set') {
+        saved = { ...saved, screenshot: await ticketsApi.setScreenshot(saved.id, screenshotChange.blob) };
+      } else if (canHaveScreenshot && screenshotChange.kind === 'remove' && saved.screenshot) {
+        await ticketsApi.deleteScreenshot(saved.id);
         saved = { ...saved, screenshot: null };
       }
     } catch (err) {
@@ -241,16 +225,13 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     if (!body || !ticket) return;
     setAddingComment(true);
     try {
-      const response = await fetch(`/api/tickets/${ticket.id}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
-      });
-      const comment: Comment = await response.json();
+      const comment = await ticketsApi.addComment(ticket.id, body);
       const updatedComments = [...comments, comment];
       setComments(updatedComments);
       setNewComment('');
       onSaved({ ...ticket, comments: updatedComments });
+    } catch {
+      setError('Couldn’t add that comment.');
     } finally {
       setAddingComment(false);
     }
@@ -263,7 +244,13 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     const updatedComments = comments.filter((comment) => comment.id !== commentId);
     setComments(updatedComments);
     onSaved({ ...ticket, comments: updatedComments });
-    await fetch(`/api/tickets/${ticket.id}/comments/${commentId}`, { method: 'DELETE' });
+    try {
+      await ticketsApi.deleteComment(ticket.id, commentId);
+    } catch {
+      setComments(comments);
+      onSaved({ ...ticket, comments });
+      setError('Couldn’t delete that comment.');
+    }
   }
 
   async function handleDelete() {
@@ -271,9 +258,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     if (!window.confirm('Delete this ticket?')) return;
     setSaving(true);
     try {
-      await fetch(`/api/tickets/${ticket.id}`, { method: 'DELETE' });
+      await ticketsApi.remove(ticket.id);
       onDeleted?.(ticket.id);
       onClose();
+    } catch {
+      setError('Couldn’t delete this ticket.');
     } finally {
       setSaving(false);
     }
@@ -283,15 +272,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     if (!ticket) return;
     setSaving(true);
     try {
-      const nextArchived = !ticket.isArchived;
-      await fetch(`/api/tickets/${ticket.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isArchived: nextArchived }),
-      });
-      // Archiving discards the screenshot server-side (see ticketsRepo.updateTicket).
-      onSaved({ ...ticket, isArchived: nextArchived, ...(nextArchived ? { screenshot: null } : {}) });
+      const { ticket: saved } = await ticketsApi.update(ticket.id, { isArchived: !ticket.isArchived });
+      onSaved(saved);
       onClose();
+    } catch {
+      setError('Couldn’t update this ticket.');
     } finally {
       setSaving(false);
     }

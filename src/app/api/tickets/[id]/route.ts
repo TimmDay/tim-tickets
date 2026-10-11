@@ -25,8 +25,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  await ticketsRepo.updateTicket(id, parsed.data);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(await ticketsRepo.updateTicket(id, parsed.data));
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

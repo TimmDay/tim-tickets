@@ -8,6 +8,7 @@ import { useEpics } from '@/lib/EpicsContext';
 import { useJogs } from '@/lib/JogsContext';
 import { computeReorder } from '@/lib/ordering';
 import { useShowArchived } from '@/lib/ShowArchivedContext';
+import { useTicketStore } from '@/lib/useTicketStore';
 import { ArchiveIcon } from './ArchiveIcon';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { ConfirmModal } from './ConfirmModal';
@@ -16,6 +17,7 @@ import { FilterInput } from './FilterInput';
 import { GripIcon } from './GripIcon';
 import { JogSelect } from './JogSelect';
 import { PlusIcon } from './PlusIcon';
+import { TicketErrorBanner } from './TicketErrorBanner';
 import { TicketModal } from './TicketModal';
 import { TrashIcon } from './TrashIcon';
 import { Epic, STATUSES, Ticket } from '@/lib/types';
@@ -33,13 +35,7 @@ function formatDueDate(value: string): string {
 export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   const { jogs, defaultJogId } = useJogs();
   const { epics } = useEpics();
-  const [tickets, setTickets] = useState(initialTickets);
-  const [prevInitialTickets, setPrevInitialTickets] = useState(initialTickets);
-
-  if (initialTickets !== prevInitialTickets) {
-    setPrevInitialTickets(initialTickets);
-    setTickets(initialTickets);
-  }
+  const [{ tickets, error }, store] = useTicketStore(initialTickets);
 
   const [search, setSearch] = useState('');
   const [jogFilter, setJogFilter] = useState('all');
@@ -132,39 +128,18 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
   }, [tickets, search, jogFilter, epicFilter, sortKey, sortDirection, jogNameById, showArchived]);
 
   async function handleReassign(ticketId: string, jogId: string) {
-    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, jogId } : t)));
-    await fetch(`/api/tickets/${ticketId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jogId }),
-    });
-  }
-
-  function handleSaved(ticket: Ticket) {
-    setTickets((prev) =>
-      prev.some((t) => t.id === ticket.id) ? prev.map((t) => (t.id === ticket.id ? ticket : t)) : [...prev, ticket],
-    );
-  }
-
-  function handleDeleted(ticketId: string) {
-    setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+    await store.update(ticketId, { jogId });
   }
 
   async function handleToggleArchive(ticketId: string, nextArchived: boolean) {
-    setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, isArchived: nextArchived } : t)));
-    await fetch(`/api/tickets/${ticketId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isArchived: nextArchived }),
-    });
+    await store.update(ticketId, { isArchived: nextArchived });
   }
 
   async function confirmDeleteTicket() {
     if (!deletingTicket) return;
     const id = deletingTicket.id;
     setDeletingTicket(null);
-    handleDeleted(id);
-    await fetch(`/api/tickets/${id}`, { method: 'DELETE' });
+    await store.remove(id);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -179,25 +154,7 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
     // visibleTickets (and `moved`) are sorted newest-first (descending `order`) when manually
     // sorted — see the manual sortKey comparator above.
     const { orderUpdates, persist } = computeReorder(moved, active.id as string, 'desc');
-
-    // `moved` is derived from visibleTickets, which excludes archived tickets — merge order
-    // updates in place rather than replacing `tickets` wholesale, or archived tickets would be
-    // dropped from local state until the next reload.
-    setTickets((prev) => prev.map((t) => (orderUpdates.has(t.id) ? { ...t, order: orderUpdates.get(t.id)! } : t)));
-
-    if (persist.kind === 'bulk') {
-      await fetch('/api/tickets/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: persist.orderedIds }),
-      });
-    } else {
-      await fetch(`/api/tickets/${persist.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: persist.order }),
-      });
-    }
+    await store.move(orderUpdates, persist);
   }
 
   function sortIndicator(key: SortKey) {
@@ -207,6 +164,8 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
 
   return (
     <div className="flex flex-col lg:h-full">
+      {error && <TicketErrorBanner message={error} onDismiss={store.clearError} />}
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative">
           <select
@@ -334,12 +293,12 @@ export function BacklogTable({ initialTickets }: { initialTickets: Ticket[] }) {
         <TicketModal
           ticket={editingTicket}
           onClose={() => setEditingTicket(null)}
-          onSaved={handleSaved}
-          onDeleted={handleDeleted}
+          onSaved={store.saved}
+          onDeleted={store.deleted}
         />
       )}
 
-      {creatingTicket && <TicketModal onClose={() => setCreatingTicket(false)} onSaved={handleSaved} />}
+      {creatingTicket && <TicketModal onClose={() => setCreatingTicket(false)} onSaved={store.saved} />}
 
       {deletingTicket && (
         <ConfirmModal

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  AGENT_COMMENT_PREFIX,
   AGENT_DISPATCH_EVENT_TYPE,
   backlogAdditions,
   blocksDispatch,
@@ -11,10 +10,9 @@ import {
   resolveReportBaseUrl,
   selectAgentRunCandidates,
 } from '@/lib/agentRuns';
-import { toGithubRepoUrl } from '@/lib/github';
 import { checkRepoAgentReadiness, sendRepositoryDispatch } from '@/lib/githubDispatch';
 import { epicsRepo, ticketsRepo } from '@/lib/repos';
-import { ALL_JOGS_ID, AGENT_MODELS } from '@/lib/types';
+import { ALL_JOGS_ID, ORDER_GAP } from '@/lib/types';
 
 const agentRunSchema = z.object({
   jogId: z.string().min(1),
@@ -55,18 +53,16 @@ export async function POST(request: Request) {
   const candidates = selectedIdSet.size > 0 ? allCandidates.filter((c) => selectedIdSet.has(c.ticket.id)) : allCandidates;
   const opusReviewIdSet = new Set(parsed.data.opusReviewIds);
 
-  // Move backlog tickets (not already in the selected jog) to the selected jog before dispatching.
-  // Compute new order values for backlog tickets: after any existing tickets in the target jog.
+  // Backlog tickets (from other jogs) join the selected jog once dispatched, after anything
+  // already in it. Worked out up front so each gets a distinct slot; applied by recordDispatch.
+  const moves = new Map<string, { jogId: string; order: number }>();
   if (parsed.data.jogId !== ALL_JOGS_ID) {
     const ticketsInJog = tickets.filter((t) => t.jogId === parsed.data.jogId);
     let maxOrderInJog = ticketsInJog.length > 0 ? Math.max(...ticketsInJog.map((t) => t.order)) : 0;
-
-    for (const candidate of candidates) {
-      if (candidate.ticket.jogId !== parsed.data.jogId) {
-        // Move ticket to the selected jog with a new order value
-        maxOrderInJog += 1000; // ORDER_GAP
-        await ticketsRepo.updateTicket(candidate.ticket.id, { jogId: parsed.data.jogId, order: maxOrderInJog });
-      }
+    for (const { ticket } of candidates) {
+      if (ticket.jogId === parsed.data.jogId) continue;
+      maxOrderInJog += ORDER_GAP;
+      moves.set(ticket.id, { jogId: parsed.data.jogId, order: maxOrderInJog });
     }
   }
 
@@ -113,18 +109,7 @@ export async function POST(request: Request) {
         return { key: ticket.key, ok: false as const, error: error instanceof Error ? error.message : String(error) };
       }
 
-      const now = new Date().toISOString();
-      const modelLabel = AGENT_MODELS.find((m) => m.value === ticket.agentModel)?.label ?? 'default model';
-      await ticketsRepo.updateTicket(ticket.id, {
-        agentDispatchedAt: now,
-        ...(ticket.status === 'todo' ? { status: 'in_progress' as const } : {}),
-      });
-      await ticketsRepo.addComment(
-        ticket.id,
-        `${AGENT_COMMENT_PREFIX} Agent dispatched to ${toGithubRepoUrl(repo).replace('https://github.com/', '')} (${modelLabel})${
-          requestOpusReview ? ', Opus review requested' : ''
-        }`,
-      );
+      await ticketsRepo.recordDispatch(ticket.id, { repo, requestOpusReview, moveTo: moves.get(ticket.id) });
       return { key: ticket.key, ok: true as const };
     }),
   );

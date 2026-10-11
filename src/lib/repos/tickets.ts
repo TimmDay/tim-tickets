@@ -1,6 +1,8 @@
 import { FieldValue } from '@google-cloud/firestore';
 import { AGENT_COMMENT_PREFIX } from '../agentRuns';
+import { GithubRepoRef } from '../github';
 import {
+  AGENT_MODELS,
   AgentModel,
   Comment,
   ORDER_GAP,
@@ -10,7 +12,7 @@ import {
   TicketScreenshot,
   TicketStatus,
 } from '../types';
-import { commitInChunks, DocSnapshotLike, FirestoreLike } from './client';
+import { commitInChunks, DocRefLike, DocSnapshotLike, FirestoreLike } from './client';
 
 function toTicket(doc: DocSnapshotLike): Ticket {
   const data = doc.data()!;
@@ -57,9 +59,23 @@ export interface UpdateTicketInput {
   dueDate?: string | null;
   tags?: string[];
   agentModel?: AgentModel | null;
-  agentDispatchedAt?: string | null;
   order?: number;
   isArchived?: boolean;
+}
+
+/** A successful "Release the bots" dispatch, recorded against the ticket it was for. */
+export interface AgentDispatch {
+  repo: GithubRepoRef;
+  requestOpusReview: boolean;
+  /** Set when the ticket came from another jog (the backlog) and joins the dispatching jog. */
+  moveTo?: { jogId: string; order: number };
+}
+
+function agentDispatchComment(dispatch: AgentDispatch, agentModel: AgentModel | null): string {
+  const modelLabel = AGENT_MODELS.find((m) => m.value === agentModel)?.label ?? 'default model';
+  return `${AGENT_COMMENT_PREFIX} Agent dispatched to ${dispatch.repo.owner}/${dispatch.repo.name} (${modelLabel})${
+    dispatch.requestOpusReview ? ', Opus review requested' : ''
+  }`;
 }
 
 export type AgentReport =
@@ -109,6 +125,19 @@ export function createTicketsRepo(db: FirestoreLike) {
   const screenshotsCollection = () => db.collection('ticketScreenshots');
 
   const TICKET_KEY_COUNTER_ID = 'tickets';
+
+  /** The epic to stamp `startedAt` on when one of its tickets first leaves `todo`: null if the
+   * ticket has no epic or the epic has already started. `read` is a plain get or a
+   * transaction's get, so both updateTicket and recordDispatch share the rule. */
+  async function epicToStart(
+    epicId: string | null | undefined,
+    read: (ref: DocRefLike) => Promise<DocSnapshotLike>,
+  ): Promise<DocRefLike | null> {
+    if (!epicId) return null;
+    const ref = epicsCollection().doc(epicId);
+    const snap = await read(ref);
+    return snap.exists && !snap.data()?.startedAt ? ref : null;
+  }
 
   /** Atomically reserves `count` consecutive ticket-key numbers (e.g. requesting 3 when the
    * counter is at 5 reserves 6, 7, 8) via a transaction on a single counter doc, so concurrent
@@ -243,13 +272,8 @@ export function createTicketsRepo(db: FirestoreLike) {
       const ticketData = ticketSnap.data();
       if (ticketData?.status === 'todo') {
         const epicId = input.epicId !== undefined ? input.epicId : (ticketData.epicId as string | null | undefined);
-        if (epicId) {
-          const epicRef = epicsCollection().doc(epicId);
-          const epicSnap = await epicRef.get();
-          if (epicSnap.exists && !epicSnap.data()?.startedAt) {
-            await epicRef.update({ startedAt: now });
-          }
-        }
+        const epicRef = await epicToStart(epicId, (ref) => ref.get());
+        if (epicRef) await epicRef.update({ startedAt: now });
       }
     }
 
@@ -267,6 +291,36 @@ export function createTicketsRepo(db: FirestoreLike) {
     await ticketsCollection()
       .doc(id)
       .update({ ...input, updatedAt: now });
+  }
+
+  /** Records a dispatch that GitHub accepted: stamps `agentDispatchedAt`, moves a `todo` ticket
+   * to `in_progress` (stamping its epic as started, same as updateTicket), optionally moves it
+   * into the dispatching jog, and comments where it went. One transaction, the counterpart of
+   * applyAgentReport, so a half-recorded dispatch can't happen. */
+  async function recordDispatch(id: string, dispatch: AgentDispatch): Promise<void> {
+    const ref = ticketsCollection().doc(id);
+    const now = new Date().toISOString();
+
+    await db.runTransaction(async (tx) => {
+      // Firestore transactions need every read before the first write.
+      const data = (await tx.get(ref)).data() ?? {};
+      const startsWork = data.status === 'todo';
+      const epicRef = startsWork ? await epicToStart(data.epicId as string | null | undefined, (r) => tx.get(r)) : null;
+
+      const comment: Comment = {
+        id: crypto.randomUUID(),
+        body: agentDispatchComment(dispatch, (data.agentModel as AgentModel | null) ?? null),
+        createdAt: now,
+      };
+      tx.update(ref, {
+        agentDispatchedAt: now,
+        ...(startsWork ? { status: 'in_progress' } : {}),
+        ...(dispatch.moveTo ?? {}),
+        comments: [...((data.comments as Comment[]) ?? []), comment],
+        updatedAt: now,
+      });
+      if (epicRef) tx.update(epicRef, { startedAt: now });
+    });
   }
 
   /** Applies an agent workflow's report: an opened PR moves the ticket to in_review, a merged
@@ -373,6 +427,7 @@ export function createTicketsRepo(db: FirestoreLike) {
     reorderTickets,
     setTicketOrders,
     updateTicket,
+    recordDispatch,
     applyAgentReport,
     deleteTicket,
     setScreenshot,

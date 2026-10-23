@@ -105,3 +105,34 @@ describe('jogsRepo.setCurrentJog', () => {
     await expect(repo.setCurrentJog(JOG_DEFAULT_ID, true)).rejects.toThrow('Cannot mark the default jog as current');
   });
 });
+
+describe('jog goal', () => {
+  it('createJog stores the goal and getJogs returns it', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createJogsRepo(db);
+
+    const created = await repo.createJog('Sprint 3', null, null, 'Ship the board');
+    expect(created.goal).toBe('Ship the board');
+
+    const jogs = await repo.getJogs();
+    expect(jogs.find((jog) => jog.id === created.id)?.goal).toBe('Ship the board');
+  });
+
+  it('defaults to an empty goal for jogs saved before goals existed', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createJogsRepo(db);
+
+    const jogs = await repo.getJogs();
+    expect(jogs.find((jog) => jog.id === JOG_SPRINT2_ID)?.goal).toBe('');
+  });
+
+  it('updateJog saves a new goal', async () => {
+    const db = createFakeFirestore(seedFirestore());
+    const repo = createJogsRepo(db);
+
+    await repo.updateJog(JOG_SPRINT2_ID, { goal: 'Systems architecture' });
+
+    const doc = await db.collection('jogs').doc(JOG_SPRINT2_ID).get();
+    expect(doc.data()?.goal).toBe('Systems architecture');
+  });
+});

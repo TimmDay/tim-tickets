@@ -4,6 +4,7 @@ import { jogsRepo } from '@/lib/repos';
 
 const updateJogSchema = z.object({
   name: z.string().trim().min(1).optional(),
+  goal: z.string().trim().optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   order: z.number().optional(),

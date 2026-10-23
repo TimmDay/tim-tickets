@@ -9,8 +9,8 @@ interface JogsContextValue {
    * once jogs have loaded) — undefined only until the initial fetch resolves. */
   defaultJogId: string | undefined;
   refresh: () => Promise<void>;
-  createJog: (name: string, startDate?: string | null, endDate?: string | null) => Promise<Jog>;
-  updateJog: (id: string, name: string, startDate: string | null, endDate: string | null) => Promise<void>;
+  createJog: (name: string, startDate?: string | null, endDate?: string | null, goal?: string) => Promise<Jog>;
+  updateJog: (id: string, name: string, startDate: string | null, endDate: string | null, goal: string) => Promise<void>;
   updateJogOrder: (id: string, order: number) => Promise<void>;
   deleteJog: (id: string) => Promise<void>;
   reorderJogs: (orderedIds: string[]) => Promise<void>;
@@ -41,25 +41,28 @@ export function JogsProvider({ children, initialJogs }: { children: ReactNode; i
     refresh();
   }, [refresh]);
 
-  const createJog = useCallback(async (name: string, startDate?: string | null, endDate?: string | null) => {
-    const response = await fetch('/api/jogs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, startDate: startDate ?? null, endDate: endDate ?? null }),
-    });
-    const jog: Jog = await response.json();
-    setJogs((prev) => [...prev, jog]);
-    return jog;
-  }, []);
+  const createJog = useCallback(
+    async (name: string, startDate?: string | null, endDate?: string | null, goal?: string) => {
+      const response = await fetch('/api/jogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, startDate: startDate ?? null, endDate: endDate ?? null, goal: goal ?? '' }),
+      });
+      const jog: Jog = await response.json();
+      setJogs((prev) => [...prev, jog]);
+      return jog;
+    },
+    [],
+  );
 
   const updateJog = useCallback(
-    async (id: string, name: string, startDate: string | null, endDate: string | null) => {
+    async (id: string, name: string, startDate: string | null, endDate: string | null, goal: string) => {
       await fetch(`/api/jogs/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, startDate, endDate }),
+        body: JSON.stringify({ name, startDate, endDate, goal }),
       });
-      setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, name, startDate, endDate } : jog)));
+      setJogs((prev) => prev.map((jog) => (jog.id === id ? { ...jog, name, startDate, endDate, goal } : jog)));
     },
     [],
   );

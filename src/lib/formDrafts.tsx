@@ -62,6 +62,7 @@ export interface NewTicketDraft {
 
 export interface NewJogDraft {
   name: string;
+  goal: string;
   startDate: string;
   endDate: string;
 }

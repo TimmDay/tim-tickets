@@ -21,12 +21,13 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
   const [name, setName] = useState(jog?.name ?? draft?.name ?? '');
   const [startDate, setStartDate] = useState(jog?.startDate ?? draft?.startDate ?? '');
   const [endDate, setEndDate] = useState(jog?.endDate ?? draft?.endDate ?? '');
+  const [goal, setGoal] = useState(jog?.goal ?? draft?.goal ?? '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (isEditing) return;
-    setDraft({ name, startDate, endDate });
-  }, [isEditing, name, startDate, endDate, setDraft]);
+    setDraft({ name, goal, startDate, endDate });
+  }, [isEditing, name, goal, startDate, endDate, setDraft]);
 
   function handleCancel() {
     clearDraft();
@@ -39,10 +40,10 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
     setSaving(true);
     try {
       if (isEditing) {
-        await updateJog(jog!.id, name.trim(), startDate || null, endDate || null);
+        await updateJog(jog!.id, name.trim(), startDate || null, endDate || null, goal.trim());
         onSaved(jog!.id);
       } else {
-        const created = await createJog(name.trim(), startDate || null, endDate || null);
+        const created = await createJog(name.trim(), startDate || null, endDate || null, goal.trim());
         clearDraft();
         onSaved(created.id);
       }
@@ -77,6 +78,17 @@ export function JogModal({ jog, onClose, onSaved }: JogModalProps) {
               onChange={(event) => setName(event.target.value)}
               autoFocus
               required
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Jog goal</label>
+            <textarea
+              value={goal}
+              onChange={(event) => setGoal(event.target.value)}
+              rows={3}
+              placeholder="What is this jog aiming at?"
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
           </div>

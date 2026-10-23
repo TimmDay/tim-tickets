@@ -12,6 +12,7 @@ import { ticketsApi } from '@/lib/ticketsApi';
 import { useTicketStore } from '@/lib/useTicketStore';
 import { ChevronDownIcon } from './ChevronDownIcon';
 import { FilterInput } from './FilterInput';
+import { JogGoalPopover } from './JogGoalPopover';
 import { JogSelect } from './JogSelect';
 import { JogColumn } from './JogColumn';
 import { ReleaseBotsModal } from './ReleaseBotsModal';
@@ -185,6 +186,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
       {/* Mobile: each control group stacked on its own line. */}
       <div className="mb-4 flex shrink-0 flex-col gap-3 lg:hidden">
         <div className="flex items-center gap-3">
+          {selectedJog && <JogGoalPopover jog={selectedJog} />}
           <JogSelect
             value={effectiveJogId}
             onChange={handleSelectJog}
@@ -241,6 +243,7 @@ export function JogBoard({ initialTickets }: { initialTickets: Ticket[] }) {
 
       {/* Desktop: single row, epic's started date shown above the epic select next to its label. */}
       <div className="mb-4 hidden shrink-0 flex-wrap items-center gap-3 lg:flex">
+        {selectedJog && <JogGoalPopover jog={selectedJog} />}
         <JogSelect
           value={effectiveJogId}
           onChange={handleSelectJog}

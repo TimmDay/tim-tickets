@@ -6,6 +6,7 @@ function toJog(doc: DocSnapshotLike): Jog {
   return {
     id: doc.id,
     name: data.name as string,
+    goal: (data.goal as string) ?? '',
     startDate: (data.startDate as string | null) ?? null,
     endDate: (data.endDate as string | null) ?? null,
     order: (data.order as number) ?? new Date(data.createdAt as string).getTime(),
@@ -17,6 +18,7 @@ function toJog(doc: DocSnapshotLike): Jog {
 
 export interface UpdateJogInput {
   name?: string;
+  goal?: string;
   startDate?: string | null;
   endDate?: string | null;
   order?: number;
@@ -39,6 +41,7 @@ export function createJogsRepo(db: FirestoreLike) {
     const now = new Date().toISOString();
     const data = {
       name: DEFAULT_JOG_NAME,
+      goal: '',
       startDate: null,
       endDate: null,
       order: Date.now(),
@@ -56,9 +59,14 @@ export function createJogsRepo(db: FirestoreLike) {
     return snapshot.docs.map(toJog);
   }
 
-  async function createJog(name: string, startDate: string | null = null, endDate: string | null = null): Promise<Jog> {
+  async function createJog(
+    name: string,
+    startDate: string | null = null,
+    endDate: string | null = null,
+    goal = '',
+  ): Promise<Jog> {
     const now = new Date().toISOString();
-    const data = { name, startDate, endDate, order: Date.now(), isArchived: false, isCurrent: false, createdAt: now };
+    const data = { name, goal, startDate, endDate, order: Date.now(), isArchived: false, isCurrent: false, createdAt: now };
     const ref = await jogsCollection().add(data);
     return { id: ref.id, ...data };
   }

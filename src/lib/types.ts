@@ -70,6 +70,8 @@ export interface Ticket {
 export interface Jog {
   id: string;
   name: string;
+  /** What this jog is aiming at, shown behind the target icon next to the board's jog select. */
+  goal: string;
   startDate: string | null;
   endDate: string | null;
   order: number;

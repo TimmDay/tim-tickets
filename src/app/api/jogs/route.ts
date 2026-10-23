@@ -4,6 +4,7 @@ import { jogsRepo } from '@/lib/repos';
 
 const createJogSchema = z.object({
   name: z.string().trim().min(1),
+  goal: z.string().trim().optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
 });
@@ -20,6 +21,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const jog = await jogsRepo.createJog(parsed.data.name, parsed.data.startDate ?? null, parsed.data.endDate ?? null);
+  const jog = await jogsRepo.createJog(
+    parsed.data.name,
+    parsed.data.startDate ?? null,
+    parsed.data.endDate ?? null,
+    parsed.data.goal ?? '',
+  );
   return NextResponse.json(jog, { status: 201 });
 }

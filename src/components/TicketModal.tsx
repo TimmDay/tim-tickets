@@ -14,6 +14,7 @@ import { AgentModelSelect } from './AgentModelSelect';
 import { ScreenshotField } from './ScreenshotField';
 import { CheckIcon } from './CheckIcon';
 import { AlertIcon } from './AlertIcon';
+import { ClipboardIcon } from './ClipboardIcon';
 import { useJogs } from '@/lib/JogsContext';
 import { useEpics } from '@/lib/EpicsContext';
 import { useNewTicketDraft } from '@/lib/formDrafts';
@@ -83,6 +84,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   const showAgentModel = hasAgentTag(tags);
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [textCopied, setTextCopied] = useState(false);
 
   const selectedEpic = epicId ? epics.find((epic) => epic.id === epicId) : null;
   const epicHasRepo = selectedEpic?.repoUrl ? true : false;
@@ -93,6 +95,12 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
     navigator.clipboard.writeText(`${window.location.origin}/tickets/${ticket.key}`);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 1500);
+  }
+
+  function handleCopyText() {
+    navigator.clipboard.writeText(`${title}\n\n${body}`);
+    setTextCopied(true);
+    setTimeout(() => setTextCopied(false), 1500);
   }
 
   useEffect(() => {
@@ -385,6 +393,15 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
                     className="rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
                   >
                     - [ ]
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyText}
+                    title="Copy title and body"
+                    className="flex items-center gap-1 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                  >
+                    <ClipboardIcon className="h-3 w-3" />
+                    {textCopied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
                 <textarea

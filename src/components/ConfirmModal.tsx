@@ -10,10 +10,10 @@ interface ConfirmModalProps {
 
 export function ConfirmModal({ title, message, confirmLabel = 'Delete', onConfirm, onCancel }: ConfirmModalProps) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onMouseDown={onCancel}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
-        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
         <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">{message}</p>

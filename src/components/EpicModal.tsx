@@ -58,10 +58,10 @@ export function EpicModal({ epic, onClose, onSaved }: EpicModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
       <div
         className="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900"
-        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <button
           type="button"

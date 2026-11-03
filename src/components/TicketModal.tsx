@@ -291,11 +291,11 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 sm:p-4" onMouseDown={onClose}>
       <div
         onPaste={handlePaste}
         className="relative h-dvh w-full overflow-y-auto bg-white px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-lg sm:pb-6 dark:bg-gray-900"
-        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <button
           type="button"
@@ -609,7 +609,7 @@ export function TicketModal({ ticket, defaultJogId, onClose, onSaved, onDeleted 
       </div>
 
       {deletingComment && (
-        <div onClick={(event) => event.stopPropagation()}>
+        <div onMouseDown={(event) => event.stopPropagation()}>
           <ConfirmModal
             title="Delete comment"
             message="Delete this comment? This cannot be undone."

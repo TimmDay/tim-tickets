@@ -86,7 +86,7 @@ export function AgentModelSelect({ value, onChange }: AgentModelSelectProps) {
       )}
 
       {pendingModel && (
-        <div onClick={(event) => event.stopPropagation()}>
+        <div onMouseDown={(event) => event.stopPropagation()}>
           <ConfirmModal
             title={`Use ${AGENT_MODELS.find((m) => m.value === pendingModel)?.label ?? 'this model'}?`}
             message="Agent runs start from scratch: the model re-reads the repo and its docs before writing any code, and a run is many turns of that. Bigger models cost several times more per run than Haiku, which handles most well-scoped tickets. Only pick this for work that needs it."
